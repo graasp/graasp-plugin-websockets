@@ -1,0 +1,33 @@
+{
+  "name": "graasp-websockets",
+  "version": "0.1.0",
+  "description": "Websockets extension for graasp",
+  "main": "dist/service-api.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/graasp/graasp-websockets.git"
+  },
+  "keywords": [
+    "graasp",
+    "websockets"
+  ],
+  "author": "Alexandre CHAU",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/graasp/graasp-websockets/issues"
+  },
+  "homepage": "https://github.com/graasp/graasp-websockets#readme",
+  "dependencies": {
+    "fastify": "^3.12.0",
+    "fastify-plugin": "^3.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.21.0",
+    "typescript": "^4.2.2"
+  }
+}

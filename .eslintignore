@@ -1,0 +1,4 @@
+# build output
+dist/*
+# type definitions files
+**/*.d.ts
