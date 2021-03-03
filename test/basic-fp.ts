@@ -28,7 +28,9 @@ function runClients() {
         sockets.map(s =>
             new Promise((resolve, reject) => {
                 s.on('message', data => resolve(data))
+                s.on('error', error => reject(error))
             })
+            .finally(() => { s.close() })
         )
     )
 

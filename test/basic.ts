@@ -29,6 +29,7 @@ function runClients() {
                 s.on('message', data => resolve(data))
                 s.on('error', error => reject(error))
             })
+            .finally(() => { s.close })
         )
     )
 
