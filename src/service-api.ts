@@ -33,10 +33,18 @@ const plugin: FastifyPluginAsync = async (fastify: FastifyInstance, options: Fas
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const ws = connection.socket
 
-        ws.on('message', data => wsChannels.broadcast(data))
+        wsChannels.clientRegister(ws)
+
+        ws.on('message', (message) => {
+            if (typeof(message) === 'string') {
+                const channelName = message
+                wsChannels.clientSubscribe(ws, channelName)
+            }
+        })
 
         ws.on('close', (code, reason) => {
             console.debug(`graasp-websocket: connection closed with code ${code}: ${reason}`)
+            wsChannels.clientRemove(ws)
         })
     })
 }
