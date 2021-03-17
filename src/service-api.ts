@@ -1,7 +1,7 @@
 /**
  * Fastify plugin for graasp-websockets
  * 
- * Integrates the {@link channels-ws.ts} abstraction
+ * Integrates the {@link WebSocketChannels} abstraction
  * in a fastify server plugin with fastify-websocket
  * 
  * @author Alexandre CHAU
