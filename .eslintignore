@@ -1,4 +1,8 @@
+# node_modules
+node_modules/
 # build output
 dist/*
 # type definitions files
 **/*.d.ts
+# coverage output
+coverage/
