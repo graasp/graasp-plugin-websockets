@@ -6,42 +6,42 @@
  * @author Alexandre CHAU
  */
 
-import fastify, { FastifyInstance } from 'fastify'
-import WebSocket from 'ws'
-import graaspWebSockets from '../src/service-api'
-import { WebSocketChannels } from '../src/ws-channels'
+import fastify, { FastifyInstance } from 'fastify';
+import WebSocket from 'ws';
+import graaspWebSockets from '../src/service-api';
+import { WebSocketChannels } from '../src/ws-channels';
 
 /**
  * Local tests network config
  */
-const PORT = 3000
-const ADDRESS = '127.0.0.1'
-const PREFIX = '/ws'
-const connUrl = `ws://${ADDRESS}:${PORT}${PREFIX}`
+const PORT = 3000;
+const ADDRESS = '127.0.0.1';
+const PREFIX = '/ws';
+const connUrl = `ws://${ADDRESS}:${PORT}${PREFIX}`;
 
 /**
  * Create a barebone websocket server and decorate it with the channels abstraction
  * @returns Object containing channels server and underlying ws server
  */
 function createWsChannels(): { channels: WebSocketChannels, wss: WebSocket.Server } {
-    const server = new WebSocket.Server({ port: PORT })
-    const wsChannels = new WebSocketChannels(server)
+    const server = new WebSocket.Server({ port: PORT });
+    const wsChannels = new WebSocketChannels(server);
 
     server.on('connection', ws => {
-        wsChannels.clientRegister(ws)
+        wsChannels.clientRegister(ws);
 
         ws.on('message', data => {
             if (typeof (data) === 'string') {
-                const channelName = data
-                wsChannels.clientSubscribe(ws, channelName)
+                const channelName = data;
+                wsChannels.clientSubscribe(ws, channelName);
             }
-        })
-    })
+        });
+    });
 
     return {
         channels: wsChannels,
         wss: server,
-    }
+    };
 }
 
 /**
@@ -50,22 +50,22 @@ function createWsChannels(): { channels: WebSocketChannels, wss: WebSocket.Serve
  */
 async function createWsFastifyInstance(): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
-        const server = fastify()
+        const server = fastify();
 
-        server.register(graaspWebSockets, { prefix: PREFIX })
+        server.register(graaspWebSockets, { prefix: PREFIX });
 
         server.listen(PORT, ADDRESS, (err, addr) => {
             if (err) {
-                console.error(err)
-                reject(err)
-                process.exit(1)
+                console.error(err);
+                reject(err);
+                process.exit(1);
             }
-            console.log(`Server started on ${addr}`)
-            resolve(server)
-        })
-    })
+            console.log(`Server started on ${addr}`);
+            resolve(server);
+        });
+    });
 
-    return promise
+    return promise;
 }
 
 /**
@@ -75,15 +75,15 @@ async function createWsFastifyInstance(): Promise<FastifyInstance> {
  * @returns Promise of Array of N websocket clients
  */
 async function createWsClients(numberClients: number, setupFn: (ws: WebSocket, done: () => void) => void): Promise<Array<WebSocket>> {
-    const clients = Array(numberClients).fill(null).map(_ => new WebSocket(connUrl))
+    const clients = Array(numberClients).fill(null).map(_ => new WebSocket(connUrl));
     return Promise.all(
         clients.map(client =>
             new Promise<WebSocket>((resolve, reject) => {
-                const done = () => resolve(client)
-                setupFn(client, done)
+                const done = () => resolve(client);
+                setupFn(client, done);
             })
         )
-    )
+    );
 }
 
 /**
@@ -92,26 +92,26 @@ async function createWsClients(numberClients: number, setupFn: (ws: WebSocket, d
  * @param numberMessages Number of messages to wait for
  * @returns Received message if numberMessages == 1, else array of received messages
  */
-async function clientWait(client: WebSocket, numberMessages: number): Promise<any | Array<any>> {
+async function clientWait(client: WebSocket, numberMessages: number): Promise<WebSocket.Data | Array<WebSocket.Data>> {
     return new Promise((resolve, reject) => {
         client.on('error', (err) => {
-            reject(err)
-        })
+            reject(err);
+        });
 
         if (numberMessages === 1) {
             client.on('message', (data) => {
-                resolve(data)
-            })
+                resolve(data);
+            });
         } else {
-            const buffer = []
+            const buffer = [];
             client.on('message', (data) => {
-                buffer.push(data)
+                buffer.push(data);
                 if (buffer.length === numberMessages) {
-                    resolve(buffer)
+                    resolve(buffer);
                 }
-            })
+            });
         }
-    })
+    });
 }
 
 /**
@@ -120,11 +120,11 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<an
  * @param numberMessages Number of messages to wait for
  * @returns Array containing the received message or array of received messages for each client
  */
-async function clientsWait(clients: Array<WebSocket>, numberMessages: number): Promise<Array<any>> {
+async function clientsWait(clients: Array<WebSocket>, numberMessages: number): Promise<Array<WebSocket.Data | Array<WebSocket.Data>>> {
     return Promise.all(
         clients.map(client => clientWait(client, numberMessages))
-    )
+    );
 }
 
 
-export { createWsChannels, createWsClients, createWsFastifyInstance, clientsWait }
+export { createWsChannels, createWsClients, createWsFastifyInstance, clientsWait };

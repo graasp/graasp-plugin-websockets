@@ -3,92 +3,92 @@
  * 
  * @author Alexandre CHAU
  */
-import WebSocket from 'ws'
+import WebSocket from 'ws';
 
-function wsSend(client: WebSocket, message: any) {
+function wsSend(client: WebSocket, message: WebSocket.Data) {
     if (client.readyState === WebSocket.OPEN) {
-        client.send(message)
+        client.send(message);
     }
 }
 
 class Channel {
-    readonly name: string
-    readonly subscribers: Set<WebSocket>
+    readonly name: string;
+    readonly subscribers: Set<WebSocket>;
 
     constructor(name: string) {
-        this.name = name
-        this.subscribers = new Set()
+        this.name = name;
+        this.subscribers = new Set();
     }
 
-    send(message: any) {
+    send(message: WebSocket.Data) {
         this.subscribers.forEach(sub => {
-            wsSend(sub, message)
-        })
+            wsSend(sub, message);
+        });
     }
 }
 
 class WebSocketChannels {
-    wsServer: WebSocket.Server
-    private channels: Map<string, Channel>
-    private subscriptions: Map<WebSocket, Set<Channel>>
+    wsServer: WebSocket.Server;
+    private channels: Map<string, Channel>;
+    private subscriptions: Map<WebSocket, Set<Channel>>;
 
     constructor(wsServer: WebSocket.Server) {
-        this.wsServer = wsServer
-        this.channels = new Map()
-        this.subscriptions = new Map()
+        this.wsServer = wsServer;
+        this.channels = new Map();
+        this.subscriptions = new Map();
     }
 
-    clientRegister(ws: WebSocket) {
-        this.subscriptions.set(ws, new Set())
+    clientRegister(ws: WebSocket): void {
+        this.subscriptions.set(ws, new Set());
     }
 
-    clientRemove(ws: WebSocket) {
-        const clientSubs = this.subscriptions.get(ws)
+    clientRemove(ws: WebSocket): void {
+        const clientSubs = this.subscriptions.get(ws);
         if (clientSubs !== undefined) {
             clientSubs.forEach(channel => {
-                channel.subscribers.delete(ws)
-            })
+                channel.subscribers.delete(ws);
+            });
         }
-        this.subscriptions.delete(ws)
+        this.subscriptions.delete(ws);
     }
 
-    clientSubscribe(ws: WebSocket, channelName: string) {
+    clientSubscribe(ws: WebSocket, channelName: string): void {
         if (this.channels.has(channelName)) {
-            const channel = this.channels.get(channelName)
-            channel.subscribers.add(ws)
-            const clientSubs = this.subscriptions.get(ws)
-            if (clientSubs !== undefined) clientSubs.add(channel)
+            const channel = this.channels.get(channelName);
+            channel.subscribers.add(ws);
+            const clientSubs = this.subscriptions.get(ws);
+            if (clientSubs !== undefined) clientSubs.add(channel);
         }
     }
 
-    clientUnsubscribe(ws: WebSocket, channelName: string) {
+    clientUnsubscribe(ws: WebSocket, channelName: string): void {
         if (this.channels.has(channelName)) {
-            const channel = this.channels.get(channelName)
-            channel.subscribers.delete(ws)
-            const clientSubs = this.subscriptions.get(ws)
-            if (clientSubs !== undefined) clientSubs.delete(channel)
+            const channel = this.channels.get(channelName);
+            channel.subscribers.delete(ws);
+            const clientSubs = this.subscriptions.get(ws);
+            if (clientSubs !== undefined) clientSubs.delete(channel);
         }
     }
 
-    channelCreate(channelName: string) {
-        const channel = new Channel(channelName)
-        this.channels.set(channelName, channel)
+    channelCreate(channelName: string): void {
+        const channel = new Channel(channelName);
+        this.channels.set(channelName, channel);
     }
 
-    channelDelete(channelName: string) {
-        const channel = this.channels.get(channelName)
+    channelDelete(channelName: string): void {
+        const channel = this.channels.get(channelName);
         channel.subscribers.forEach(sub => {
-            const subChannels = this.subscriptions.get(sub)
+            const subChannels = this.subscriptions.get(sub);
             if (subChannels !== undefined) {
-                subChannels.delete(channel)
+                subChannels.delete(channel);
             }
-        })
-        this.channels.delete(channelName)
+        });
+        this.channels.delete(channelName);
     }
 
-    channelSend(channelName: string, message: any) {
+    channelSend(channelName: string, message: WebSocket.Data): void {
         if (this.channels.has(channelName)) {
-            this.channels.get(channelName).send(message)
+            this.channels.get(channelName).send(message);
         }
     }
 
@@ -96,11 +96,11 @@ class WebSocketChannels {
      * Sends an object message to all connected clients
      * @param message Object to broadcast to everyone
      */
-    broadcast(message: any) {
+    broadcast(message: WebSocket.Data): void {
         this.wsServer.clients.forEach(client => {
-            wsSend(client, message)
-        })
+            wsSend(client, message);
+        });
     }
 }
 
-export { WebSocketChannels }
+export { WebSocketChannels };

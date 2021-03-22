@@ -6,72 +6,70 @@
  * @author Alexandre CHAU
  */
 
-import { WebSocketChannels } from '../src/ws-channels'
-import { clientsWait, createWsChannels, createWsClients } from './test-utils'
-import WebSocket from 'ws'
+import { WebSocketChannels } from '../src/ws-channels';
+import { clientsWait, createWsChannels, createWsClients } from './test-utils';
+import WebSocket from 'ws';
 
-let testEnv: Partial<{
+const testEnv: Partial<{
     channels: WebSocketChannels,
     wss: WebSocket.Server,
     subs1: Array<WebSocket>,
     subs2: Array<WebSocket>,
-}> = {}
+}> = {};
 
 
-beforeAll(async (done) => {
+beforeAll(async () => {
     // create channels abstraction on some ws server
-    const { channels, wss } = createWsChannels()
-    testEnv.channels = channels
-    testEnv.wss = wss
+    const { channels, wss } = createWsChannels();
+    testEnv.channels = channels;
+    testEnv.wss = wss;
 
     // create some channels
-    channels.channelCreate('1')
-    channels.channelCreate('2')
+    channels.channelCreate('1');
+    channels.channelCreate('2');
 
     // spawn 5 clients and sub them to channel 1
     testEnv.subs1 = await createWsClients(5, (client, done) => {
         client.on('open', () => {
-            client.send('1')
-            done()
-        })
-    })
+            client.send('1');
+            done();
+        });
+    });
 
     // spawn 5 clients and sub them to channel 2
     testEnv.subs2 = await createWsClients(5, (client, done) => {
         client.on('open', () => {
-            client.send('2')
-            done()
-        })
-    })
-
-    done()
-})
+            client.send('2');
+            done();
+        });
+    });
+});
 
 
 
 test("Clients subscribed to channel '1' all receive 'msg1'", () => {
     const test = clientsWait(testEnv.subs1, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe('msg1')
-        })
-    })
-    testEnv.channels.channelSend('1', 'msg1')
-    return test
-})
+            expect(value).toBe('msg1');
+        });
+    });
+    testEnv.channels.channelSend('1', 'msg1');
+    return test;
+});
 
 test("Clients subscribed to channel '2' all receive 'msg2", () => {
     const test = clientsWait(testEnv.subs2, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe('msg2')
-        })
-    })
-    testEnv.channels.channelSend('2', 'msg2')
-    return test
-})
+            expect(value).toBe('msg2');
+        });
+    });
+    testEnv.channels.channelSend('2', 'msg2');
+    return test;
+});
 
 
 afterAll(() => {
-    testEnv.wss.close()
-    testEnv.subs1.forEach(client => client.close())
-    testEnv.subs2.forEach(client => client.close())
-})
+    testEnv.wss.close();
+    testEnv.subs1.forEach(client => client.close());
+    testEnv.subs2.forEach(client => client.close());
+});
