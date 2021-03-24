@@ -40,6 +40,17 @@ class WebSocketChannels {
 
     clientRegister(ws: WebSocket): void {
         this.subscriptions.set(ws, new Set());
+
+        ws.on('message', (message) => {
+            if (typeof (message) === 'string') {
+                const channelName = message;
+                this.clientSubscribe(ws, channelName);
+            }
+        });
+
+        ws.on('close', (code, reason) => {
+            this.clientRemove(ws);
+        });
     }
 
     clientRemove(ws: WebSocket): void {

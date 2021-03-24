@@ -23,29 +23,10 @@ const plugin: FastifyPluginAsync = async (fastify: FastifyInstance, options: Fas
         }
     });
 
-    const wsServer = fastify.websocketServer;
-    const wsChannels = new WebSocketChannels(wsServer);
-
-    wsServer.on('connection', (sock) => {
-        console.debug(`graasp-websocket: new client`);
-    });
+    const wsChannels = new WebSocketChannels(fastify.websocketServer);
 
     fastify.get(prefix, { websocket: true }, (connection, req) => {
-        const ws = connection.socket;
-
-        wsChannels.clientRegister(ws);
-
-        ws.on('message', (message) => {
-            if (typeof (message) === 'string') {
-                const channelName = message;
-                wsChannels.clientSubscribe(ws, channelName);
-            }
-        });
-
-        ws.on('close', (code, reason) => {
-            console.debug(`graasp-websocket: connection closed with code ${code}: ${reason}`);
-            wsChannels.clientRemove(ws);
-        });
+        wsChannels.clientRegister(connection.socket);
     });
 };
 

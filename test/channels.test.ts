@@ -69,7 +69,7 @@ test("Clients subscribed to channel '2' all receive 'msg2", () => {
 
 
 afterAll(() => {
-    testEnv.wss.close();
     testEnv.subs1.forEach(client => client.close());
     testEnv.subs2.forEach(client => client.close());
+    testEnv.wss.close();
 });
