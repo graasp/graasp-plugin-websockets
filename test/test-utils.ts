@@ -19,6 +19,14 @@ const ADDRESS = '127.0.0.1';
 const PREFIX = '/ws';
 const connUrl = `ws://${ADDRESS}:${PORT}${PREFIX}`;
 
+/** Exported config */
+const config = {
+    port: PORT,
+    address: ADDRESS,
+    prefix: PREFIX,
+    connUrl: connUrl,
+};
+
 /**
  * Create a barebone websocket server and decorate it with the channels abstraction
  * @returns Object containing channels server and underlying ws server
@@ -29,13 +37,6 @@ function createWsChannels(): { channels: WebSocketChannels, wss: WebSocket.Serve
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
-
-        ws.on('message', data => {
-            if (typeof (data) === 'string') {
-                const channelName = data;
-                wsChannels.clientSubscribe(ws, channelName);
-            }
-        });
     });
 
     return {
@@ -45,27 +46,35 @@ function createWsChannels(): { channels: WebSocketChannels, wss: WebSocket.Serve
 }
 
 /**
- * Create a fastify server in which graasp-websockets plugin was registered
- * @returns Promise of fastify server instance with graasp-websockets plugin
+ * Creates a barebone fastify server
+ * @param setupFn a setup function applied to the fastify instance before starting the server
+ * @returns Promise of fastify server instance
  */
-async function createWsFastifyInstance(): Promise<FastifyInstance> {
+async function createFastifyInstance(setupFn: (instance: FastifyInstance) => void = _ => { /*noop*/ }): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify();
 
-        server.register(graaspWebSockets, { prefix: PREFIX });
+        setupFn(server);
 
         server.listen(PORT, ADDRESS, (err, addr) => {
             if (err) {
-                console.error(err);
-                reject(err);
-                process.exit(1);
+                reject(err.message);
             }
-            console.log(`Server started on ${addr}`);
             resolve(server);
         });
     });
 
     return promise;
+}
+
+/**
+ * Creates a fastify server in which graasp-websockets plugin was registered
+ * @returns Promise of fastify server instance with graasp-websockets plugin
+ */
+async function createWsFastifyInstance(): Promise<FastifyInstance> {
+    return createFastifyInstance(async instance => {
+        await instance.register(graaspWebSockets, { prefix: PREFIX });
+    });
 }
 
 /**
@@ -127,4 +136,4 @@ async function clientsWait(clients: Array<WebSocket>, numberMessages: number): P
 }
 
 
-export { createWsChannels, createWsClients, createWsFastifyInstance, clientsWait };
+export { config, createWsChannels, createWsClients, createFastifyInstance, createWsFastifyInstance, clientsWait };
