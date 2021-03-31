@@ -6,9 +6,9 @@
  * @author Alexandre CHAU
  */
 
+import WebSocket from 'ws';
 import { WebSocketChannels } from '../src/ws-channels';
 import { clientsWait, createWsChannels, createWsClients } from './test-utils';
-import WebSocket from 'ws';
 
 const testEnv: Partial<{
     channels: WebSocketChannels,

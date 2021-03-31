@@ -27,6 +27,7 @@ const schema = {
 /**
  * This does not test the behaviour of our code, but simply exhibits a behavior of fastify-websocket:
  * fastify will validate the schema on the response instead of the request on a GET endpoint
+ * See https://www.fastify.io/docs/v3.12.x/Validation-and-Serialization/#validation
  */
 test('fastify validates body response instead of request on GET endpoint', async () => {
     const test = new Promise((resolve, reject) => {
@@ -63,10 +64,12 @@ test('fastify validates body response instead of request on GET endpoint', async
  * websocket connections can only be established over GET requests
  */
 test('fastify-websocket cannot accept POST requests for websocket connections', async () => {
-    await expect(createFastifyInstance(async instance => {
+    const test = createFastifyInstance(async instance => {
         await instance.register(fws);
         instance.post(config.prefix, { websocket: true }, (connection, req) => {
             throw new Error('This line should never be reached, the server should not be able to start');
         });
-    })).rejects.toMatch('websocket handler can only be declared in GET method');
+    });
+
+    return expect(test).rejects.toMatch('websocket handler can only be declared in GET method');
 });
