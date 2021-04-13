@@ -7,7 +7,7 @@
  */
 
 import fws from 'fastify-websocket';
-import { config, createFastifyInstance, createWsClients } from './test-utils';
+import { createDefaultLocalConfig, createFastifyInstance, createWsClients } from './test-utils';
 
 
 
@@ -30,8 +30,9 @@ const schema = {
  * See https://www.fastify.io/docs/v3.12.x/Validation-and-Serialization/#validation
  */
 test('fastify validates body response instead of request on GET endpoint', async () => {
+    const config = createDefaultLocalConfig({ port: 3000 });
     const test = new Promise((resolve, reject) => {
-        createFastifyInstance(async instance => {
+        createFastifyInstance(config, async instance => {
             await instance.register(fws, {
                 errorHandler: (err, conn, req, reply) => {
                     // when the client connects, this error handler will be triggered
@@ -45,7 +46,7 @@ test('fastify validates body response instead of request on GET endpoint', async
                 /* noop */
             });
         }).then(_ => {
-            createWsClients(1, (client, done) => {
+            createWsClients(config, 1, (client, done) => {
                 client.on('open', () => {
                     client.send(JSON.stringify(message));
                     client.close();
@@ -64,7 +65,8 @@ test('fastify validates body response instead of request on GET endpoint', async
  * websocket connections can only be established over GET requests
  */
 test('fastify-websocket cannot accept POST requests for websocket connections', async () => {
-    const test = createFastifyInstance(async instance => {
+    const config = createDefaultLocalConfig({ port: 3001 });
+    const test = createFastifyInstance(config, async instance => {
         await instance.register(fws);
         instance.post(config.prefix, { websocket: true }, (connection, req) => {
             throw new Error('This line should never be reached, the server should not be able to start');
