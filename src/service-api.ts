@@ -1,4 +1,6 @@
 /**
+ * graasp-websockets
+ * 
  * Fastify plugin for graasp-websockets
  * 
  * Integrates the {@link WebSocketChannels} abstraction

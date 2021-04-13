@@ -9,6 +9,7 @@
 import WebSocket from 'ws';
 import { WebSocketChannels } from '../src/ws-channels';
 import { clientsWait, createDefaultLocalConfig, createWsChannels, createWsClients } from './test-utils';
+import { createPayloadMessage } from '../src/interfaces/message';
 
 const testEnv: Partial<{
     channels: WebSocketChannels,
@@ -50,22 +51,24 @@ beforeAll(async () => {
 
 
 test("Clients subscribed to channel '1' all receive 'msg1'", () => {
+    const msg = createPayloadMessage('msg1');
     const test = clientsWait(testEnv.subs1, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe('msg1');
+            expect(value).toBe(msg);
         });
     });
-    testEnv.channels.channelSend('1', 'msg1');
+    testEnv.channels.channelSend('1', msg);
     return test;
 });
 
 test("Clients subscribed to channel '2' all receive 'msg2", () => {
+    const msg = createPayloadMessage('msg2');
     const test = clientsWait(testEnv.subs2, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe('msg2');
+            expect(value).toBe(msg);
         });
     });
-    testEnv.channels.channelSend('2', 'msg2');
+    testEnv.channels.channelSend('2', msg);
     return test;
 });
 
