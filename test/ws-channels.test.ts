@@ -6,6 +6,8 @@
  * @author Alexandre CHAU
  */
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import WebSocket from 'ws';
 import { WebSocketChannels } from '../src/ws-channels';
 import { clientsWait, createDefaultLocalConfig, createWsChannels, createWsClients } from './test-utils';
@@ -52,29 +54,29 @@ beforeAll(async () => {
 
 test("Clients subscribed to channel '1' all receive 'msg1'", () => {
     const msg = createPayloadMessage('msg1');
-    const test = clientsWait(testEnv.subs1, 1).then(data => {
+    const test = clientsWait(testEnv.subs1!, 1).then(data => {
         data.forEach(value => {
             expect(value).toBe(msg);
         });
     });
-    testEnv.channels.channelSend('1', msg);
+    testEnv.channels!.channelSend('1', msg);
     return test;
 });
 
 test("Clients subscribed to channel '2' all receive 'msg2", () => {
     const msg = createPayloadMessage('msg2');
-    const test = clientsWait(testEnv.subs2, 1).then(data => {
+    const test = clientsWait(testEnv.subs2!, 1).then(data => {
         data.forEach(value => {
             expect(value).toBe(msg);
         });
     });
-    testEnv.channels.channelSend('2', msg);
+    testEnv.channels!.channelSend('2', msg);
     return test;
 });
 
 
 afterAll(() => {
-    testEnv.subs1.forEach(client => client.close());
-    testEnv.subs2.forEach(client => client.close());
-    testEnv.wss.close();
+    testEnv.subs1!.forEach(client => client.close());
+    testEnv.subs2!.forEach(client => client.close());
+    testEnv.wss!.close();
 });

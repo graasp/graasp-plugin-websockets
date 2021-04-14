@@ -20,7 +20,8 @@ const serdes: MessageSerializer = new AjvMessageSerializer();
  */
 function wsSend(client: WebSocket, message: ServerMessage) {
     if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+        const serialized = serdes.serialize(message);
+        client.send(serialized);
     }
 }
 
@@ -137,8 +138,8 @@ class WebSocketChannels {
      * @param channelName name of the channel
      */
     clientSubscribe(ws: WebSocket, channelName: string): void {
-        if (this.channels.has(channelName)) {
-            const channel = this.channels.get(channelName);
+        const channel = this.channels.get(channelName);
+        if (channel !== undefined) {
             channel.subscribers.add(ws);
             const clientSubs = this.subscriptions.get(ws);
             if (clientSubs !== undefined) clientSubs.add(channel);
@@ -167,8 +168,8 @@ class WebSocketChannels {
      * @param channelName name of the channel
      */
     clientUnsubscribe(ws: WebSocket, channelName: string): void {
-        if (this.channels.has(channelName)) {
-            const channel = this.channels.get(channelName);
+        const channel = this.channels.get(channelName);
+        if (channel !== undefined) {
             channel.subscribers.delete(ws);
             const clientSubs = this.subscriptions.get(ws);
             if (clientSubs !== undefined) clientSubs.delete(channel);
@@ -190,13 +191,15 @@ class WebSocketChannels {
      */
     channelDelete(channelName: string): void {
         const channel = this.channels.get(channelName);
-        channel.subscribers.forEach(sub => {
-            const subChannels = this.subscriptions.get(sub);
-            if (subChannels !== undefined) {
-                subChannels.delete(channel);
-            }
-        });
-        this.channels.delete(channelName);
+        if (channel !== undefined) {
+            channel.subscribers.forEach(sub => {
+                const subChannels = this.subscriptions.get(sub);
+                if (subChannels !== undefined) {
+                    subChannels.delete(channel);
+                }
+            });
+            this.channels.delete(channelName);
+        }
     }
 
     /**
@@ -204,9 +207,8 @@ class WebSocketChannels {
      * @param channelName name of the channel to send a message on
      */
     channelSend(channelName: string, message: ServerMessage): void {
-        if (this.channels.has(channelName)) {
-            this.channels.get(channelName).send(message);
-        }
+        const channel = this.channels.get(channelName);
+        if (channel !== undefined) channel.send(message);
     }
 
     /**

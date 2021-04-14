@@ -16,11 +16,15 @@ import { WebSocketChannels } from '../src/ws-channels';
  * @returns Object containing channels server and underlying ws server
  */
 function createWsChannels(config: { host: string, port: number }): { channels: WebSocketChannels, wss: WebSocket.Server } {
-    const server = new WebSocket.Server({ port: config.port, host: config.host });
+    const server = new WebSocket.Server({ port: config.port });
     const wsChannels = new WebSocketChannels(server);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
+    });
+
+    server.on('error', err => {
+        throw err;
     });
 
     return {
@@ -116,7 +120,7 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<We
                 resolve(data);
             });
         } else {
-            const buffer = [];
+            const buffer: Array<WebSocket.Data> = [];
             client.on('message', (data) => {
                 buffer.push(data);
                 if (buffer.length === numberMessages) {
