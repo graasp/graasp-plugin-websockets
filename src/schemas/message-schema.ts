@@ -12,24 +12,28 @@ import { JTDSchemaType } from "ajv-latest/dist/jtd";
 import { ClientMessage } from "../interfaces/message";
 
 const clientMessageSchema: JTDSchemaType<ClientMessage> = {
-    properties: {
-        type: { enum: ["notif"] }
-    },
     discriminator: "action",
-    mappings: {
-        "disconnect": {},
+    mapping: {
+        "disconnect": {
+            properties: {
+                type: { enum: ["notif"] },
+            }
+        },
         "subscribe": {
             properties: {
+                type: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         },
         "unsubscribe": {
             properties: {
+                type: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         },
         "subscribeOnly": {
             properties: {
+                type: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         }
