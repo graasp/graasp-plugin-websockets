@@ -9,35 +9,50 @@
  * @author Alexandre CHAU
  */
 import { JTDSchemaType } from "ajv-latest/dist/jtd";
-import { ClientMessage } from "../interfaces/message";
+import { ClientMessage, ServerMessage } from "../interfaces/message";
 
 const clientMessageSchema: JTDSchemaType<ClientMessage> = {
     discriminator: "action",
     mapping: {
         "disconnect": {
             properties: {
-                type: { enum: ["notif"] },
+                realm: { enum: ["notif"] },
             }
         },
         "subscribe": {
             properties: {
-                type: { enum: ["notif"] },
+                realm: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         },
         "unsubscribe": {
             properties: {
-                type: { enum: ["notif"] },
+                realm: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         },
         "subscribeOnly": {
             properties: {
-                type: { enum: ["notif"] },
+                realm: { enum: ["notif"] },
                 channel: { type: "string" }
             }
         }
     }
 };
 
-export { clientMessageSchema };
+const serverMessageSchema: JTDSchemaType<ServerMessage> = {
+    properties: {
+        realm: { enum: ["notif"] }
+    },
+    optionalProperties: {
+        error: {
+            properties: {
+                name: { type: "string" },
+                message: { type: "string" },
+            },
+        },
+        body: {},
+    },
+};
+
+export { clientMessageSchema, serverMessageSchema };

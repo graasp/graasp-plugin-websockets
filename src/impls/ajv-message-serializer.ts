@@ -11,13 +11,13 @@
 import Ajv from 'ajv-latest/dist/jtd';
 import { ClientMessage, ServerMessage } from '../interfaces/message';
 import { MessageSerializer } from '../interfaces/message-serializer';
-import { clientMessageSchema } from '../schemas/message-schema';
+import { clientMessageSchema, serverMessageSchema } from '../schemas/message-schema';
 
 const ajv = new Ajv();
 
 class AjvMessageSerializer implements MessageSerializer {
     /** @inheritdoc */
-    serialize = ajv.compileSerializer<ServerMessage>(clientMessageSchema);
+    serialize = ajv.compileSerializer<ServerMessage>(serverMessageSchema);
 
     /** @inheritdoc */
     parse = ajv.compileParser<ClientMessage>(clientMessageSchema);

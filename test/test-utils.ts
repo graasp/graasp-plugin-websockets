@@ -8,8 +8,13 @@
 
 import fastify, { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
+import { AjvClientMessageSerializer } from '../client/impls/ajv-client-message-serializer';
+import { ClientMessageSerializer } from '../client/interfaces/client-message-serializer';
+import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
+
+const serdes: ClientMessageSerializer = new AjvClientMessageSerializer();
 
 /**
  * Create a barebone websocket server and decorate it with the channels abstraction
@@ -109,7 +114,7 @@ async function createWsClients(config: { host: string, port: number, prefix: str
  * @param numberMessages Number of messages to wait for
  * @returns Received message if numberMessages == 1, else array of received messages
  */
-async function clientWait(client: WebSocket, numberMessages: number): Promise<WebSocket.Data | Array<WebSocket.Data>> {
+async function clientWait(client: WebSocket, numberMessages: number): Promise<ServerMessage | Array<ServerMessage>> {
     return new Promise((resolve, reject) => {
         client.on('error', (err) => {
             reject(err);
@@ -117,12 +122,16 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<We
 
         if (numberMessages === 1) {
             client.on('message', (data) => {
-                resolve(data);
+                const msg = serdes.parse(data);
+                if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
+                else resolve(msg);
             });
         } else {
-            const buffer: Array<WebSocket.Data> = [];
+            const buffer: Array<ServerMessage> = [];
             client.on('message', (data) => {
-                buffer.push(data);
+                const msg = serdes.parse(data);
+                if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
+                else buffer.push(msg);
                 if (buffer.length === numberMessages) {
                     resolve(buffer);
                 }
@@ -137,11 +146,19 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<We
  * @param numberMessages Number of messages to wait for
  * @returns Array containing the received message or array of received messages for each client
  */
-async function clientsWait(clients: Array<WebSocket>, numberMessages: number): Promise<Array<WebSocket.Data | Array<WebSocket.Data>>> {
+async function clientsWait(clients: Array<WebSocket>, numberMessages: number): Promise<Array<ServerMessage | Array<ServerMessage>>> {
     return Promise.all(
         clients.map(client => clientWait(client, numberMessages))
     );
 }
 
+/**
+ * Performs necessary conversion to send valid message from client
+ * @param data ClientMessage to be sent
+ */
+function clientSend(client: WebSocket, data: ClientMessage): void {
+    client.send(serdes.serialize(data));
+}
 
-export { createDefaultLocalConfig, createWsChannels, createWsClients, createFastifyInstance, createWsFastifyInstance, clientsWait };
+
+export { createDefaultLocalConfig, createWsChannels, createWsClients, createFastifyInstance, createWsFastifyInstance, clientsWait, clientSend };

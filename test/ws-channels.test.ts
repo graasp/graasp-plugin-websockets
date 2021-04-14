@@ -9,9 +9,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import WebSocket from 'ws';
-import { WebSocketChannels } from '../src/ws-channels';
-import { clientsWait, createDefaultLocalConfig, createWsChannels, createWsClients } from './test-utils';
 import { createPayloadMessage } from '../src/interfaces/message';
+import { WebSocketChannels } from '../src/ws-channels';
+import { clientSend, clientsWait, createDefaultLocalConfig, createWsChannels, createWsClients } from './test-utils';
 
 const testEnv: Partial<{
     channels: WebSocketChannels,
@@ -33,18 +33,20 @@ beforeAll(async () => {
     channels.channelCreate('1');
     channels.channelCreate('2');
 
+    const numClients = 5;
+
     // spawn 5 clients and sub them to channel 1
-    testEnv.subs1 = await createWsClients(config, 5, (client, done) => {
+    testEnv.subs1 = await createWsClients(config, numClients, (client, done) => {
         client.on('open', () => {
-            client.send('1');
+            clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
             done();
         });
     });
 
     // spawn 5 clients and sub them to channel 2
-    testEnv.subs2 = await createWsClients(config, 5, (client, done) => {
+    testEnv.subs2 = await createWsClients(config, numClients, (client, done) => {
         client.on('open', () => {
-            client.send('2');
+            clientSend(client, { realm: "notif", action: "subscribe", channel: "2" });
             done();
         });
     });
@@ -56,7 +58,7 @@ test("Clients subscribed to channel '1' all receive 'msg1'", () => {
     const msg = createPayloadMessage('msg1');
     const test = clientsWait(testEnv.subs1!, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe(msg);
+            expect(value).toStrictEqual(msg);
         });
     });
     testEnv.channels!.channelSend('1', msg);
@@ -67,9 +69,22 @@ test("Clients subscribed to channel '2' all receive 'msg2", () => {
     const msg = createPayloadMessage('msg2');
     const test = clientsWait(testEnv.subs2!, 1).then(data => {
         data.forEach(value => {
-            expect(value).toBe(msg);
+            expect(value).toStrictEqual(msg);
         });
     });
+    testEnv.channels!.channelSend('2', msg);
+    return test;
+});
+
+test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", () => {
+    const msg = createPayloadMessage('hello2');
+    const test = clientsWait(testEnv.subs2!, 1).then(data => {
+        data.forEach(value => {
+            expect(value).toStrictEqual(msg);
+        });
+    });
+    const other = createPayloadMessage('hello1');
+    testEnv.channels!.channelSend('1', other);
     testEnv.channels!.channelSend('2', msg);
     return test;
 });

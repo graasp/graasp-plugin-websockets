@@ -13,7 +13,7 @@
  * Must have the "notif" type to allow future message types unrelated to notifications
  */
 interface Message {
-    type: "notif",
+    realm: "notif",
 }
 
 /**
@@ -49,37 +49,38 @@ interface ClientSubscribeOnly extends Message {
 }
 
 /**
- * Error message sent by server
+ * Restricted error to be sent to clients
  */
-interface ServerError extends Message {
-    error: Error
+interface Error {
+    name: string,
+    message: string,
+}
+
+/**
+ * Message sent by server
+ */
+interface ServerMessage extends Message {
+    error?: Error
+    body?: any
 }
 
 /**
  * Factory to create a server error message
  */
-function createErrorMessage(error: Error): ServerError {
+function createErrorMessage(error: Error): ServerMessage {
     return {
-        type: "notif",
+        realm: "notif",
         error: error,
     };
 }
 
 /**
- * Arbitrary data sent by server
- * TODO: replace with actual data types sent by server
- */
-interface ServerPayload extends Message {
-    payload: any
-}
-
-/**
  * Factory to create a server payload message
  */
-function createPayloadMessage(data: any): ServerPayload {
+function createPayloadMessage(data: any): ServerMessage {
     return {
-        type: "notif",
-        payload: data,
+        realm: "notif",
+        body: data,
     };
 }
 
@@ -87,10 +88,5 @@ function createPayloadMessage(data: any): ServerPayload {
  * Client message type is union type of all client message subtypes
  */
 type ClientMessage = ClientDisconnect | ClientSubscribe | ClientUnsubscribe | ClientSubscribeOnly;
-
-/**
- * Server message type is union type of all server message subtypes
- */
-type ServerMessage = ServerError | ServerPayload;
 
 export { ClientMessage, ServerMessage, createErrorMessage, createPayloadMessage };
