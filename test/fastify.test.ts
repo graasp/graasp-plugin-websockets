@@ -7,9 +7,9 @@
  */
 
 import fws from 'fastify-websocket';
-import { createDefaultLocalConfig, createFastifyInstance, createWsClients } from './test-utils';
+import { createDefaultLocalConfig, createFastifyInstance, createWsClients, PortGenerator } from './test-utils';
 
-
+const portGen = new PortGenerator(3000);
 
 const message = { a: 2, b: 'test' };
 
@@ -30,7 +30,7 @@ const schema = {
  * See https://www.fastify.io/docs/v3.12.x/Validation-and-Serialization/#validation
  */
 test('fastify validates body response instead of request on GET endpoint', async () => {
-    const config = createDefaultLocalConfig({ port: 3000 });
+    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
     const test = new Promise((resolve, reject) => {
         createFastifyInstance(config, async instance => {
             await instance.register(fws, {
@@ -65,7 +65,7 @@ test('fastify validates body response instead of request on GET endpoint', async
  * websocket connections can only be established over GET requests
  */
 test('fastify-websocket cannot accept POST requests for websocket connections', async () => {
-    const config = createDefaultLocalConfig({ port: 3001 });
+    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
     const test = createFastifyInstance(config, async instance => {
         await instance.register(fws);
         instance.post(config.prefix, { websocket: true }, (connection, req) => {

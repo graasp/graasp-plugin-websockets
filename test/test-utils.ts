@@ -17,15 +17,54 @@ import { WebSocketChannels } from '../src/ws-channels';
 const serdes: ClientMessageSerializer = new AjvClientMessageSerializer();
 
 /**
+ * Test config type
+ * Specifies server configuration for test run
+ */
+interface TestConfig {
+    host: string,
+    port: number,
+    prefix: string,
+}
+
+/**
+ * Creates a default local config for tests with 127.0.0.1 host and /ws prefix
+ * @param options server configuration
+ */
+function createDefaultLocalConfig(options: { port: number }): TestConfig {
+    return {
+        host: '127.0.0.1',
+        port: options.port,
+        prefix: '/ws'
+    };
+}
+
+/**
+ * Utility class to generate new port numbers
+ */
+class PortGenerator {
+    port: number;
+
+    constructor(initPort: number) {
+        this.port = initPort;
+    }
+
+    getNewPort(): number {
+        this.port += 1;
+        return this.port;
+    }
+}
+
+/**
  * Create a barebone websocket server and decorate it with the channels abstraction
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(config: { host: string, port: number }): { channels: WebSocketChannels, wss: WebSocket.Server } {
+function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }): { channels: WebSocketChannels, wss: WebSocket.Server } {
     const server = new WebSocket.Server({ port: config.port });
     const wsChannels = new WebSocketChannels(server);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
+        clientConnOverrides(ws);
     });
 
     server.on('error', err => {
@@ -43,7 +82,7 @@ function createWsChannels(config: { host: string, port: number }): { channels: W
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
-async function createFastifyInstance(config: { host: string, port: number }, setupFn: (instance: FastifyInstance) => void = _ => { /*noop*/ }): Promise<FastifyInstance> {
+async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => void = _ => { /*noop*/ }): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify();
 
@@ -64,30 +103,31 @@ async function createFastifyInstance(config: { host: string, port: number }, set
  * Creates a fastify server in which graasp-websockets plugin was registered
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: { host: string, port: number, prefix: string }): Promise<FastifyInstance> {
+async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInstance> {
     return createFastifyInstance(config, async instance => {
         await instance.register(graaspWebSockets, { prefix: config.prefix });
     });
 }
 
 /**
- * Creates a default local config for tests with 127.0.0.1 host and /ws prefix
- * @param options server configuration
- */
-function createDefaultLocalConfig(options: { port: number }): { host: string, port: number, prefix: string } {
-    return {
-        host: '127.0.0.1',
-        port: options.port,
-        prefix: '/ws'
-    };
-}
-
-/**
  * Creates a connection URL for a WebSocket.Client given
  * a host, port and prefix config
  */
-function createConnUrl(config: { host: string, port: number, prefix: string }): string {
+function createConnUrl(config: TestConfig): string {
     return `ws://${config.host}:${config.port}${config.prefix}`;
+}
+
+/**
+ * Create a barebone websocket client
+ * @param setupFn Setup function for the client. The done callback parameter MUST be called inside!
+ * @returns Promise of websocket client
+ */
+async function createWsClient(config: TestConfig, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<WebSocket> {
+    return new Promise((resolve, reject) => {
+        const client = new WebSocket(createConnUrl(config));
+        const done = () => resolve(client);
+        setupFn(client, done);
+    });
 }
 
 /**
@@ -96,16 +136,9 @@ function createConnUrl(config: { host: string, port: number, prefix: string }): 
  * @param setupFn Setup function passed to each of the N clients, the done callback parameter MUST be called inside!
  * @returns Promise of Array of N websocket clients
  */
-async function createWsClients(config: { host: string, port: number, prefix: string }, numberClients: number, setupFn: (ws: WebSocket, done: () => void) => void): Promise<Array<WebSocket>> {
-    const clients = Array(numberClients).fill(null).map(_ => new WebSocket(createConnUrl(config)));
-    return Promise.all(
-        clients.map(client =>
-            new Promise<WebSocket>((resolve, reject) => {
-                const done = () => resolve(client);
-                setupFn(client, done);
-            })
-        )
-    );
+async function createWsClients(config: TestConfig, numberClients: number, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<Array<WebSocket>> {
+    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config, setupFn));
+    return Promise.all(clients);
 }
 
 /**
@@ -161,4 +194,4 @@ function clientSend(client: WebSocket, data: ClientMessage): void {
 }
 
 
-export { createDefaultLocalConfig, createWsChannels, createWsClients, createFastifyInstance, createWsFastifyInstance, clientsWait, clientSend };
+export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };

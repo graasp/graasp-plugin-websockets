@@ -1,7 +1,7 @@
 /**
  * graasp-websockets
  * 
- * JSON Type Definitions for {@link ClientMessage} types
+ * JSON Type Definitions for {@link Message} types
  * See:
  *  https://ajv.js.org/guide/typescript.html
  *  https://ajv.js.org/json-type-definition.html
@@ -11,6 +11,10 @@
 import { JTDSchemaType } from "ajv-latest/dist/jtd";
 import { ClientMessage, ServerMessage } from "../interfaces/message";
 
+/**
+ * Client message schema
+ * MUST conform to {@link ClientMessage} (provide equivalent runtime types)
+ */
 const clientMessageSchema: JTDSchemaType<ClientMessage> = {
     discriminator: "action",
     mapping: {
@@ -40,6 +44,11 @@ const clientMessageSchema: JTDSchemaType<ClientMessage> = {
     }
 };
 
+
+/**
+ * Server message schema
+ * MUST conform to {@link ServerMessage} (provide equivalent runtime types)
+ */
 const serverMessageSchema: JTDSchemaType<ServerMessage> = {
     properties: {
         realm: { enum: ["notif"] }
