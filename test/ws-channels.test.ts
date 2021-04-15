@@ -19,11 +19,11 @@ describe('Server internal behavior', () => {
     test("Client connecting to server is registered and then removed on close", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         // we need to be informed when the client actually disconnects from the server side:
-        const clientDisconnect = new Promise<WebSocketChannels>((resolve, reject) => {
-            const { channels } = createWsChannels(config, client => {
+        const clientDisconnect = new Promise<{ channels: WebSocketChannels, wss: WebSocket.Server }>((resolve, reject) => {
+            const { channels, wss } = createWsChannels(config, client => {
                 // we intercept server.on("connection") and add a close listener to resolve when client disconnects
                 client.addEventListener("close", () => {
-                    resolve(channels);
+                    resolve({ channels, wss });
                 });
             });
             // tell ESLint we are not expecting the following promise, but the one resolving above
@@ -31,14 +31,14 @@ describe('Server internal behavior', () => {
             createWsClient(config).then(client => {
                 // after client connected, it should be registered
                 expect(channels.subscriptions.size).toEqual(1);
-                // close from client side
                 client.close();
             });
         });
         // wait until client disconnects
-        const channels = await clientDisconnect;
+        const { channels, wss } = await clientDisconnect;
         // after client closed, it should be unregistered
         expect(channels.subscriptions.size).toEqual(0);
+        wss.close();
     });
 });
 
