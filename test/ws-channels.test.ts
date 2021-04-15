@@ -87,6 +87,7 @@ describe('Channel messages sent by server are received by clients', () => {
         wss: WebSocket.Server,
         subs1: Array<WebSocket>,
         subs2: Array<WebSocket>,
+        unsubs: Array<WebSocket>,
     }> = {};
 
 
@@ -119,6 +120,9 @@ describe('Channel messages sent by server are received by clients', () => {
                 done();
             });
         });
+
+        // spawn 5 clients and don't sub them
+        testEnv.unsubs = await createWsClients(config, numClients);
     });
 
     test("Clients subscribed to channel '1' all receive 'msg1'", () => {
@@ -144,15 +148,36 @@ describe('Channel messages sent by server are received by clients', () => {
     });
 
     test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", () => {
-        const msg = createPayloadMessage('hello2');
-        const test = clientsWait(testEnv.subs2!, 1).then(data => {
+        const hello2 = createPayloadMessage('hello2');
+        const hello1 = createPayloadMessage('hello1');
+        // ESLint does not detect that the promise is combined into Promise.all below
+        // eslint-disable-next-line jest/valid-expect-in-promise
+        const test1 = clientsWait(testEnv.subs1!, 1).then(data => {
             data.forEach(value => {
-                expect(value).toStrictEqual(msg);
+                expect(value).toStrictEqual(hello1);
             });
         });
-        const other = createPayloadMessage('hello1');
-        testEnv.channels!.channelSend('1', other);
-        testEnv.channels!.channelSend('2', msg);
+        // ESLint does not detect that the promise is combined into Promise.all below
+        // eslint-disable-next-line jest/valid-expect-in-promise
+        const test2 = clientsWait(testEnv.subs2!, 1).then(data => {
+            data.forEach(value => {
+                expect(value).toStrictEqual(hello2);
+            });
+        });
+        testEnv.channels!.channelSend('1', hello1);
+        testEnv.channels!.channelSend('2', hello2);
+        return Promise.all([test1, test2]);
+    });
+
+    test("All clients receive broadcasts even if not subscribed to channels", async () => {
+        const broadcastMsg = createPayloadMessage({ hello: "world" });
+        const clientsShouldReceive = new Array<WebSocket>().concat(testEnv.subs1!, testEnv.subs2!, testEnv.unsubs!);
+        const test = clientsWait(clientsShouldReceive, 1).then(data => {
+            data.forEach(value => {
+                expect(value).toStrictEqual(broadcastMsg);
+            });
+        });
+        testEnv.channels!.broadcast(broadcastMsg);
         return test;
     });
 
@@ -160,6 +185,7 @@ describe('Channel messages sent by server are received by clients', () => {
     afterAll(() => {
         testEnv.subs1!.forEach(client => client.close());
         testEnv.subs2!.forEach(client => client.close());
+        testEnv.unsubs!.forEach(client => client.close());
         testEnv.wss!.close();
     });
 });
