@@ -16,29 +16,48 @@ import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWs
 const portGen = new PortGenerator(4000);
 
 describe('Server internal behavior', () => {
+    test("Adding / removing a channel is registered", () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels: server, wss } = createWsChannels(config);
+        expect(server.channels.size).toEqual(0);
+        server.channelCreate("hello");
+        expect(server.channels.size).toEqual(1);
+        expect(server.channels.get("hello")).toEqual({ name: "hello", subscribers: new Set() });
+        server.channelCreate("world");
+        expect(server.channels.size).toEqual(2);
+        expect(server.channels.get("hello")).toEqual({ name: "hello", subscribers: new Set() });
+        expect(server.channels.get("world")).toEqual({ name: "world", subscribers: new Set() });
+        server.channelDelete("unknown");
+        expect(server.channels.size).toEqual(2);
+        server.channelDelete("hello");
+        expect(server.channels.size).toEqual(1);
+        expect(server.channels.get("hello")).toEqual(undefined);
+        expect(server.channels.get("world")).toEqual({ name: "world", subscribers: new Set() });
+        server.channelDelete("world");
+        expect(server.channels.size).toEqual(0);
+        wss.close();
+    });
+
     test("Client connecting to server is registered and then removed on close", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         // we need to be informed when the client actually disconnects from the server side:
-        const clientDisconnect = new Promise<{ channels: WebSocketChannels, wss: WebSocket.Server }>((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const { channels, wss } = createWsChannels(config, client => {
                 // we intercept server.on("connection") and add a close listener to resolve when client disconnects
                 client.addEventListener("close", () => {
-                    resolve({ channels, wss });
+                    // after client closed, it should be unregistered
+                    expect(channels.subscriptions.size).toEqual(0);
+                    wss.close();
+                    // test finishes here
+                    resolve();
                 });
             });
-            // tell ESLint we are not expecting the following promise, but the one resolving above
-            // eslint-disable-next-line jest/valid-expect-in-promise
             createWsClient(config).then(client => {
                 // after client connected, it should be registered
                 expect(channels.subscriptions.size).toEqual(1);
                 client.close();
             });
         });
-        // wait until client disconnects
-        const { channels, wss } = await clientDisconnect;
-        // after client closed, it should be unregistered
-        expect(channels.subscriptions.size).toEqual(0);
-        wss.close();
     });
 });
 
