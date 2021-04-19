@@ -222,4 +222,4 @@ class WebSocketChannels {
     }
 }
 
-export { WebSocketChannels, serdes };
+export { WebSocketChannels };
