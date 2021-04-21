@@ -29,13 +29,14 @@ async function startServer() {
     wsChannels.channelCreate('chat');
 
     server.get('/chat', { websocket: true }, (conn, req) => {
-        wsChannels.clientRegister(conn.socket);
+        const client = conn.socket;
 
-        conn.socket.on('message', (data) => {
-            if (typeof data === 'string') {
-                const message = JSON.parse(data);
-                wsChannels.broadcast(message);
-            }
+        wsChannels.clientRegister(client);
+
+        wsChannels.clientSubscribe(client, 'chat');
+
+        client.on('message', (data) => {
+            wsChannels.channelSend('chat', data);
         });
     });
 
