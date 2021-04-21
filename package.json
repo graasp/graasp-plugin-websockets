@@ -32,6 +32,7 @@
     "fastify-websocket": "^3.0.0"
   },
   "devDependencies": {
+    "@types/graasp": "git://github.com/graasp/graasp-types.git#master",
     "@types/jest": "^26.0.20",
     "@types/ws": "^7.4.0",
     "@typescript-eslint/eslint-plugin": "^4.19.0",

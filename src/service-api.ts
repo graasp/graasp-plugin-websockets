@@ -9,7 +9,7 @@
  * @author Alexandre CHAU
  */
 
-import { FastifyInstance, FastifyPluginAsync, FastifyPluginOptions } from 'fastify';
+import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
@@ -17,10 +17,20 @@ import { ClientMessage, createErrorMessage, ServerMessage } from './interfaces/m
 import { MessageSerializer } from './interfaces/message-serializer';
 import { WebSocketChannels } from './ws-channels';
 
+declare module 'fastify' {
+    interface FastifyInstance {
+        websocketChannels: WebSocketChannels<ClientMessage, ServerMessage>;
+    }
+}
+
+interface GraaspWebsocketsPluginOptions {
+    prefix: string;
+}
+
 // Serializer / Deserializer instance
 const serdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
-const plugin: FastifyPluginAsync = async (fastify: FastifyInstance, options: FastifyPluginOptions) => {
+const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify, options) => {
     const prefix = options.prefix ? options.prefix : '/ws';
 
     // must await this register call: otherwise decorated properties on `fastify` are not available
