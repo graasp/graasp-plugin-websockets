@@ -50,8 +50,9 @@
             });
 
             function send() {
-                const msg = $('#input').val()
+                const msg = $('#input').val();
                 socket.send(msg);
+                $('#input').val('');
             }
 
             $('#send').click(() => {
