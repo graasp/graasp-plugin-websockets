@@ -19,7 +19,7 @@ jobs:
         check-latest: true
 
     - name: Install modules
-      run: npm ci
+      run: npm install
 
     - name: Build
       run: npm run build
