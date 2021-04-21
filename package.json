@@ -2,7 +2,8 @@
   "name": "graasp-websockets",
   "version": "0.1.0",
   "description": "Websockets extension for graasp",
-  "main": "dist/service-api.js",
+  "main": "dist/src/service-api.js",
+  "types": "dist/src/service-api.d.ts",
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
@@ -32,7 +33,7 @@
     "fastify-websocket": "^3.0.0"
   },
   "devDependencies": {
-    "@types/graasp": "git://github.com/graasp/graasp-types.git#master",
+    "@types/graasp": "git+https://github.com/graasp/graasp-types.git#master",
     "@types/jest": "^26.0.20",
     "@types/ws": "^7.4.0",
     "@typescript-eslint/eslint-plugin": "^4.19.0",
