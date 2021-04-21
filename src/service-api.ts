@@ -12,8 +12,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
+import { Item } from 'graasp';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { ClientMessage, createErrorMessage, ServerMessage } from './interfaces/message';
+import { ClientMessage, createErrorMessage, createPayloadMessage, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
 import { WebSocketChannels } from './ws-channels';
 
@@ -31,7 +32,12 @@ interface GraaspWebsocketsPluginOptions {
 const serdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
 const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify, options) => {
+    // destructure passed fastify instance
     const prefix = options.prefix ? options.prefix : '/ws';
+    const {
+        items: { taskManager },
+        taskRunner: runner,
+    } = fastify;
 
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
@@ -72,6 +78,10 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribe": {
+                        // TODO: proper validation of channel before creating it
+                        if (!wsChannels.channels.has(request.channel)) {
+                            wsChannels.channelCreate(request.channel);
+                        }
                         wsChannels.clientSubscribe(client, request.channel);
                         break;
                     }
@@ -91,6 +101,22 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         client.on('close', (code, reason) => {
             wsChannels.clientRemove(client);
         });
+    });
+
+    /**
+     * Register graasp behavior into websocket channels system
+     */
+
+    // on create item, notify parent
+    const createItemTaskName = taskManager.getCreateTaskName();
+    runner.setTaskPostHookHandler<Item>(createItemTaskName, async (item) => {
+        const { id, name, path } = item;
+        // TODO: use proper abstraction to find parent
+        const tokens = path.split('.');
+        if (tokens.length >= 2) {
+            const parentId = tokens[tokens.length - 2].replace(/_/g, '-');
+            wsChannels.channelSend(parentId, createPayloadMessage({ id, name }));
+        }
     });
 };
 
