@@ -8,9 +8,9 @@
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
+import { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { createPayloadMessage } from '../src/interfaces/message';
-import { WebSocketChannels } from '../src/ws-channels';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
@@ -41,21 +41,22 @@ describe('Server internal behavior', () => {
     test("Client connecting to server is registered and then removed on close", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         // we need to be informed when the client actually disconnects from the server side:
-        return new Promise<void>((resolve, reject) =>  {
+        return new Promise<void>((resolve, reject) => {
             createWsFastifyInstance(config, (client, server) => {
                 // we intercept server.on("connection") and add a close listener to resolve when client disconnects
                 client.addEventListener("close", () => {
                     // after client closed, it should be unregistered
-                    expect(channels.subscriptions.size).toEqual(0);
+                    expect(server.websocketChannels.subscriptions.size).toEqual(0);
                     server.close();
                     // test finishes here
                     resolve();
                 });
-            });
-            createWsClient(config).then(client => {
-                // after client connected, it should be registered
-                expect(channels.subscriptions.size).toEqual(1);
-                client.close();
+            }).then(server => {
+                createWsClient(config).then(client => {
+                    // after client connected, it should be registered
+                    expect(server.websocketChannels.subscriptions.size).toEqual(1);
+                    client.close();
+                });
             });
         });
     });
@@ -64,17 +65,12 @@ describe('Server internal behavior', () => {
 describe('Client requests are handled', () => {
     const testEnv: Partial<{
         config: TestConfig,
-        channels: WebSocketChannels,
-        wss: WebSocket.Server,
+        server: FastifyInstance,
     }> = {};
 
-    beforeAll(() => {
+    beforeAll(async () => {
         testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-
-        // create channels abstraction on some ws server
-        const { channels, wss } = createWsChannels(testEnv.config);
-        testEnv.channels = channels;
-        testEnv.wss = wss;
+        testEnv.server = await createWsFastifyInstance(testEnv.config);
     });
 
     test("Client sending an ill-formed request receives an error message", async () => {
@@ -95,15 +91,14 @@ describe('Client requests are handled', () => {
     });
 
     afterAll(() => {
-        testEnv.wss!.close();
+        testEnv.server!.close();
     });
 });
 
 
 describe('Channel messages sent by server are received by clients', () => {
     const testEnv: Partial<{
-        channels: WebSocketChannels,
-        wss: WebSocket.Server,
+        server: FastifyInstance,
         subs1: Array<WebSocket>,
         subs2: Array<WebSocket>,
         unsubs: Array<WebSocket>,
@@ -113,12 +108,10 @@ describe('Channel messages sent by server are received by clients', () => {
     beforeAll(async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
-        // create channels abstraction on some ws server
-        const { channels, wss } = createWsChannels(config);
-        testEnv.channels = channels;
-        testEnv.wss = wss;
+        testEnv.server = await createWsFastifyInstance(config);
 
         // create some channels
+        const channels = testEnv.server.websocketChannels;
         channels.channelCreate('1');
         channels.channelCreate('2');
 
@@ -151,7 +144,7 @@ describe('Channel messages sent by server are received by clients', () => {
                 expect(value).toStrictEqual(msg);
             });
         });
-        testEnv.channels!.channelSend('1', msg);
+        testEnv.server!.websocketChannels.channelSend('1', msg);
         return test;
     });
 
@@ -162,7 +155,7 @@ describe('Channel messages sent by server are received by clients', () => {
                 expect(value).toStrictEqual(msg);
             });
         });
-        testEnv.channels!.channelSend('2', msg);
+        testEnv.server!.websocketChannels.channelSend('2', msg);
         return test;
     });
 
@@ -183,8 +176,8 @@ describe('Channel messages sent by server are received by clients', () => {
                 expect(value).toStrictEqual(hello2);
             });
         });
-        testEnv.channels!.channelSend('1', hello1);
-        testEnv.channels!.channelSend('2', hello2);
+        testEnv.server!.websocketChannels.channelSend('1', hello1);
+        testEnv.server!.websocketChannels.channelSend('2', hello2);
         return Promise.all([test1, test2]);
     });
 
@@ -196,7 +189,7 @@ describe('Channel messages sent by server are received by clients', () => {
                 expect(value).toStrictEqual(broadcastMsg);
             });
         });
-        testEnv.channels!.broadcast(broadcastMsg);
+        testEnv.server!.websocketChannels.broadcast(broadcastMsg);
         return test;
     });
 
@@ -205,6 +198,6 @@ describe('Channel messages sent by server are received by clients', () => {
         testEnv.subs1!.forEach(client => client.close());
         testEnv.subs2!.forEach(client => client.close());
         testEnv.unsubs!.forEach(client => client.close());
-        testEnv.wss!.close();
+        testEnv.server!.close();
     });
 });
