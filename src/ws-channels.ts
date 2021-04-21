@@ -6,31 +6,14 @@
  * @author Alexandre CHAU
  */
 import WebSocket from 'ws';
-import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { createErrorMessage, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
-
-// Serializer / Deserializer instance
-const serdes: MessageSerializer = new AjvMessageSerializer();
-
-/**
- * Helper to send a message to a websocket client
- * @param client WebSocket client to send to
- * @param message ServerMessage to transmit
- */
-function wsSend(client: WebSocket, message: ServerMessage) {
-    if (client.readyState === WebSocket.OPEN) {
-        const serialized = serdes.serialize(message);
-        client.send(serialized);
-    }
-}
 
 /**
  * Represents a WebSocket channel which clients can subscribe to
  * @member name Name of the channel
  * @member subscribers Subscribers to the channel
  */
-class Channel {
+class Channel<ServerMessageType>{
     readonly name: string;
     readonly subscribers: Set<WebSocket>;
 
@@ -39,9 +22,9 @@ class Channel {
         this.subscribers = new Set();
     }
 
-    send(message: ServerMessage) {
+    send(message: ServerMessageType, sendFn: (client: WebSocket, msg: ServerMessageType) => void) {
         this.subscribers.forEach(sub => {
-            wsSend(sub, message);
+            sendFn(sub, message);
         });
     }
 }
@@ -50,22 +33,38 @@ class Channel {
  * Channels abstraction over WebSocket server
  * Logic to handle clients and channels
  */
-class WebSocketChannels {
+class WebSocketChannels<ClientMessageType, ServerMessageType> {
     // Underlying WebSocket server
     wsServer: WebSocket.Server;
     // Collection of existing channels, identified by name for lookup
-    channels: Map<string, Channel>;
+    channels: Map<string, Channel<ServerMessageType>>;
     // Collection of all client subscriptions, identified by client for lookup
-    subscriptions: Map<WebSocket, Set<Channel>>;
+    subscriptions: Map<WebSocket, Set<Channel<ServerMessageType>>>;
+    // Serialization / Deserialization object instance
+    serdes: MessageSerializer<ClientMessageType, ServerMessageType>;
 
     /**
      * Creates a new WebSocketChannels instance
      * @param wsServer Underlying WebSocket.Server
+     * @param serdes Message serializer/desserializer for this specific server channels abstraction
      */
-    constructor(wsServer: WebSocket.Server) {
+    constructor(wsServer: WebSocket.Server, serdes: MessageSerializer<ClientMessageType, ServerMessageType>) {
         this.wsServer = wsServer;
+        this.serdes = serdes;
         this.channels = new Map();
         this.subscriptions = new Map();
+    }
+
+    /**
+     * Helper to send a message to a websocket client from this server
+     * @param client WebSocket client to send to
+     * @param message ServerMessage to transmit
+     */
+    clientSend(client: WebSocket, message: ServerMessageType): void {
+        if (client.readyState === WebSocket.OPEN) {
+            const serialized = this.serdes.serialize(message);
+            client.send(serialized);
+        }
     }
 
     /**
@@ -74,47 +73,6 @@ class WebSocketChannels {
      */
     clientRegister(ws: WebSocket): void {
         this.subscriptions.set(ws, new Set());
-
-        /**
-         * Handle incoming requests
-         * Validate and dispatch received requests from client
-         */
-        ws.on('message', (message) => {
-            const request = serdes.parse(message);
-            if (request === undefined) {
-                // validation error, send feedback
-                const err = createErrorMessage({
-                    name: "Invalid request message",
-                    message: "Request message format was not understood by the server"
-                });
-                wsSend(ws, err);
-            } else {
-                // request is type-safe as a ClientMessage
-                switch (request.action) {
-                    case "disconnect": {
-                        this.clientRemove(ws);
-                        break;
-                    }
-                    case "subscribe": {
-                        this.clientSubscribe(ws, request.channel);
-                        break;
-                    }
-                    case "subscribeOnly": {
-                        this.clientSubscribeOnly(ws, request.channel);
-                        break;
-                    }
-                    case "unsubscribe": {
-                        this.clientUnsubscribe(ws, request.channel);
-                        break;
-                    }
-                }
-            }
-        });
-
-        // cleanup when client closes
-        ws.on('close', (code, reason) => {
-            this.clientRemove(ws);
-        });
     }
 
 
@@ -181,7 +139,7 @@ class WebSocketChannels {
      * @param channelName name of the new channel
      */
     channelCreate(channelName: string): void {
-        const channel = new Channel(channelName);
+        const channel = new Channel<ServerMessageType>(channelName);
         this.channels.set(channelName, channel);
     }
 
@@ -206,18 +164,18 @@ class WebSocketChannels {
      * Send a message on a given channel
      * @param channelName name of the channel to send a message on
      */
-    channelSend(channelName: string, message: ServerMessage): void {
+    channelSend(channelName: string, message: ServerMessageType): void {
         const channel = this.channels.get(channelName);
-        if (channel !== undefined) channel.send(message);
+        if (channel !== undefined) channel.send(message, this.clientSend);
     }
 
     /**
      * Sends an object message to all connected clients
      * @param message Object to broadcast to everyone
      */
-    broadcast(message: ServerMessage): void {
+    broadcast(message: ServerMessageType): void {
         this.wsServer.clients.forEach(client => {
-            wsSend(client, message);
+            this.clientSend(client, message);
         });
     }
 }

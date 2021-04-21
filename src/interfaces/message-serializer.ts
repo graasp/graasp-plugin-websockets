@@ -9,22 +9,21 @@
  */
 
 import WebSocket from 'ws';
-import { ClientMessage, ServerMessage } from './message';
 
-interface MessageSerializer {
+interface MessageSerializer<ClientMessageType, ServerMessageType> {
     /**
      * Serializes a server message into a raw WebSocket.Data message
      * @param object Server data to send to client
      * @returns a WebSocket.Data compatible raw message representation
      */
-    serialize(object: ServerMessage): WebSocket.Data
+    serialize(object: ServerMessageType): WebSocket.Data
 
     /**
      * Deserializes raw client data into a compatible message
      * @param data Client data received by server
      * @returns a ClientMessage or undefined if the parsing was unsuccessful
      */
-    parse(data: WebSocket.Data): ClientMessage | undefined
+    parse(data: WebSocket.Data): ClientMessageType | undefined
 }
 
 export { MessageSerializer };

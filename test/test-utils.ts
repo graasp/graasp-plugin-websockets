@@ -10,11 +10,14 @@ import fastify, { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
 import { AjvClientMessageSerializer } from '../client/impls/ajv-client-message-serializer';
 import { ClientMessageSerializer } from '../client/interfaces/client-message-serializer';
+import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
+import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
 
-const serdes: ClientMessageSerializer = new AjvClientMessageSerializer();
+const clientSerdes: ClientMessageSerializer = new AjvClientMessageSerializer();
+const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
 /**
  * Test config type
@@ -58,9 +61,9 @@ class PortGenerator {
  * Create a barebone websocket server and decorate it with the channels abstraction
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }): { channels: WebSocketChannels, wss: WebSocket.Server } {
+function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
     const server = new WebSocket.Server({ port: config.port });
-    const wsChannels = new WebSocketChannels(server);
+    const wsChannels = new WebSocketChannels(server, serverSerdes);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
@@ -103,9 +106,14 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
  * Creates a fastify server in which graasp-websockets plugin was registered
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInstance> {
+async function createWsFastifyInstance(config: TestConfig, clientConnOverrides: (client: WebSocket, server: FastifyInstance) => void = _ => { /* noop */ }): Promise<FastifyInstance> {
     return createFastifyInstance(config, async instance => {
         await instance.register(graaspWebSockets, { prefix: config.prefix });
+
+        // plug in debug hooks
+        instance.websocketServer.addListener('connection', ws => {
+            clientConnOverrides(ws, instance);
+        });
     });
 }
 
@@ -155,14 +163,14 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<Se
 
         if (numberMessages === 1) {
             client.on('message', (data) => {
-                const msg = serdes.parse(data);
+                const msg = clientSerdes.parse(data);
                 if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
                 else resolve(msg);
             });
         } else {
             const buffer: Array<ServerMessage> = [];
             client.on('message', (data) => {
-                const msg = serdes.parse(data);
+                const msg = clientSerdes.parse(data);
                 if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
                 else buffer.push(msg);
                 if (buffer.length === numberMessages) {
@@ -190,7 +198,7 @@ async function clientsWait(clients: Array<WebSocket>, numberMessages: number): P
  * @param data ClientMessage to be sent
  */
 function clientSend(client: WebSocket, data: ClientMessage): void {
-    client.send(serdes.serialize(data));
+    client.send(clientSerdes.serialize(data));
 }
 
 

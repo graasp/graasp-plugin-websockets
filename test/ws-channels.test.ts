@@ -11,7 +11,7 @@
 import WebSocket from 'ws';
 import { createPayloadMessage } from '../src/interfaces/message';
 import { WebSocketChannels } from '../src/ws-channels';
-import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, PortGenerator, TestConfig } from './test-utils';
+import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
 
@@ -41,13 +41,13 @@ describe('Server internal behavior', () => {
     test("Client connecting to server is registered and then removed on close", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         // we need to be informed when the client actually disconnects from the server side:
-        return new Promise<void>((resolve, reject) => {
-            const { channels, wss } = createWsChannels(config, client => {
+        return new Promise<void>((resolve, reject) =>  {
+            createWsFastifyInstance(config, (client, server) => {
                 // we intercept server.on("connection") and add a close listener to resolve when client disconnects
                 client.addEventListener("close", () => {
                     // after client closed, it should be unregistered
                     expect(channels.subscriptions.size).toEqual(0);
-                    wss.close();
+                    server.close();
                     // test finishes here
                     resolve();
                 });

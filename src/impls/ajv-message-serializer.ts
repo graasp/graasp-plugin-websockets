@@ -9,18 +9,17 @@
  * @author Alexandre CHAU
  */
 import Ajv from 'ajv-latest/dist/jtd';
-import { ClientMessage, ServerMessage } from '../interfaces/message';
 import { MessageSerializer } from '../interfaces/message-serializer';
 import { clientMessageSchema, serverMessageSchema } from '../schemas/message-schema';
 
 const ajv = new Ajv();
 
-class AjvMessageSerializer implements MessageSerializer {
+class AjvMessageSerializer<ClientMessageType, ServerMessageType> implements MessageSerializer<ClientMessageType, ServerMessageType> {
     /** @inheritdoc */
-    serialize = ajv.compileSerializer<ServerMessage>(serverMessageSchema);
+    serialize = ajv.compileSerializer<ServerMessageType>(serverMessageSchema);
 
     /** @inheritdoc */
-    parse = ajv.compileParser<ClientMessage>(clientMessageSchema);
+    parse = ajv.compileParser<ClientMessageType>(clientMessageSchema);
 }
 
 export { AjvMessageSerializer };
