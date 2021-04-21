@@ -48,6 +48,9 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;
 
+        // register client into channels system
+        wsChannels.clientRegister(client);
+
         /**
          * Handle incoming requests
          * Validate and dispatch received requests from client
@@ -88,9 +91,6 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         client.on('close', (code, reason) => {
             wsChannels.clientRemove(client);
         });
-
-        // register client into channels system
-        wsChannels.clientRegister(client);
     });
 };
 
