@@ -166,7 +166,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      */
     channelSend(channelName: string, message: ServerMessageType): void {
         const channel = this.channels.get(channelName);
-        if (channel !== undefined) channel.send(message, this.clientSend);
+        if (channel !== undefined) channel.send(message, (client, message) => this.clientSend(client, message));
     }
 
     /**
