@@ -30,6 +30,37 @@ class Channel<ServerMessageType>{
 }
 
 /**
+ * Represents a client connected to this server
+ * @member ws WebSocket of this client connection
+ * @member subscriptions Channels to which this client is subscribed to
+ * @member isAlive Boolean that indicates if this client is still connected
+ */
+class Client<ServerMessageType>{
+    readonly ws: WebSocket;
+    readonly subscriptions: Set<Channel<ServerMessageType>>;
+    isAlive: boolean;
+
+    constructor(ws: WebSocket) {
+        this.ws = ws;
+        this.subscriptions = new Set();
+        this.isAlive = true;
+
+        // on heartbeat response, keep alive
+        this.ws.on("pong", data => {
+            this.isAlive = true;
+        });
+    }
+
+    /**
+     * Cleanup when removing this client
+     * MUST be called when the client closes
+     */
+    close() {
+        this.ws.removeEventListener("pong");
+    }
+}
+
+/**
  * Channels abstraction over WebSocket server
  * Logic to handle clients and channels
  */
@@ -39,20 +70,58 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
     // Collection of existing channels, identified by name for lookup
     channels: Map<string, Channel<ServerMessageType>>;
     // Collection of all client subscriptions, identified by client for lookup
-    subscriptions: Map<WebSocket, Set<Channel<ServerMessageType>>>;
+    subscriptions: Map<WebSocket, Client<ServerMessageType>>;
     // Serialization / Deserialization object instance
     serdes: MessageSerializer<ClientMessageType, ServerMessageType>;
+    // Heartbeat interval instance
+    heartbeat: NodeJS.Timeout;
 
     /**
      * Creates a new WebSocketChannels instance
      * @param wsServer Underlying WebSocket.Server
      * @param serdes Message serializer/desserializer for this specific server channels abstraction
+     * @param heartbeatInterval Time interval in ms between heartbeat checks for lost connections,
+     *                          MUST be at least an order of magnitude higher than network RTT
      */
-    constructor(wsServer: WebSocket.Server, serdes: MessageSerializer<ClientMessageType, ServerMessageType>) {
+    constructor(wsServer: WebSocket.Server,
+        serdes: MessageSerializer<ClientMessageType, ServerMessageType>,
+        heartbeatInterval: number = 30000) {
+
         this.wsServer = wsServer;
         this.serdes = serdes;
         this.channels = new Map();
         this.subscriptions = new Map();
+
+        // checks lost connections every defined time interval
+        this.heartbeat = setInterval(() => {
+            // find clients that are not registered anymore
+            this.wsServer.clients.forEach(ws => {
+                if (this.subscriptions.get(ws) === undefined) {
+                    console.log(`graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`);
+                    ws.terminate();
+                }
+            });
+            // find registered clients that lost connection
+            this.subscriptions.forEach((client, ws) => {
+                // if client was already marked dead, terminate its connection
+                if (client.isAlive === false) {
+                    // remove from this instance also
+                    this.clientRemove(ws);
+                    console.log(`graasp-websockets: ejecting client ${ws.url}, timeout detected`);
+                    return ws.terminate();
+                }
+
+                // mark all as dead and then send ping
+                // (which will set them alive again when pong response is received in {@link Client})
+                client.isAlive = false;
+                ws.ping();
+            });
+        }, heartbeatInterval);
+
+        // cleanup if server closes
+        this.wsServer.on("close", () => {
+            clearInterval(this.heartbeat);
+        });
     }
 
     /**
@@ -72,7 +141,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param ws New client to register
      */
     clientRegister(ws: WebSocket): void {
-        this.subscriptions.set(ws, new Set());
+        this.subscriptions.set(ws, new Client(ws));
     }
 
 
@@ -81,11 +150,12 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param ws Client to remove, nothing will happen if the client is not registered
      */
     clientRemove(ws: WebSocket): void {
-        const clientSubs = this.subscriptions.get(ws);
-        if (clientSubs !== undefined) {
-            clientSubs.forEach(channel => {
+        const client = this.subscriptions.get(ws);
+        if (client !== undefined) {
+            client.subscriptions.forEach(channel => {
                 channel.subscribers.delete(ws);
             });
+            client.close();
         }
         this.subscriptions.delete(ws);
     }
@@ -99,8 +169,8 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.add(ws);
-            const clientSubs = this.subscriptions.get(ws);
-            if (clientSubs !== undefined) clientSubs.add(channel);
+            const client = this.subscriptions.get(ws);
+            if (client !== undefined) client.subscriptions.add(channel);
         }
     }
 
@@ -110,11 +180,11 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param channelName name of the channel
      */
     clientSubscribeOnly(ws: WebSocket, channelName: string): void {
-        const clientSubs = this.subscriptions.get(ws);
-        if (clientSubs !== undefined) {
-            clientSubs.forEach(channel => {
+        const client = this.subscriptions.get(ws);
+        if (client !== undefined) {
+            client.subscriptions.forEach(channel => {
                 channel.subscribers.delete(ws);
-                clientSubs.delete(channel);
+                client.subscriptions.delete(channel);
             });
         }
         this.clientSubscribe(ws, channelName);
@@ -129,8 +199,8 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.delete(ws);
-            const clientSubs = this.subscriptions.get(ws);
-            if (clientSubs !== undefined) clientSubs.delete(channel);
+            const client = this.subscriptions.get(ws);
+            if (client !== undefined) client.subscriptions.delete(channel);
         }
     }
 
@@ -151,9 +221,9 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.forEach(sub => {
-                const subChannels = this.subscriptions.get(sub);
-                if (subChannels !== undefined) {
-                    subChannels.delete(channel);
+                const client = this.subscriptions.get(sub);
+                if (client !== undefined) {
+                    client.subscriptions.delete(channel);
                 }
             });
             this.channels.delete(channelName);

@@ -9,6 +9,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import { FastifyInstance } from 'fastify';
+import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import { createPayloadMessage } from '../src/interfaces/message';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
@@ -59,6 +60,21 @@ describe('Server internal behavior', () => {
                 });
             });
         });
+    });
+
+    test("Client with broken connection is unregistered by heartbeat", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels, wss } = createWsChannels(config, () => { /* noop */ }, 100);
+        const clients = await createWsClients(config, 2);
+        expect(channels.subscriptions.size).toEqual(2);
+        // forcefully close client 0
+        clients[0].terminate();
+        // client 0 should not be registered anymmore
+        await waitForExpect(() => {
+            expect(channels.subscriptions.size).toEqual(1);
+        });
+        clients.forEach(client => client.close());
+        wss.close();
     });
 });
 

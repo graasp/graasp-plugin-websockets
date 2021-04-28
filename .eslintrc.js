@@ -11,7 +11,7 @@ module.exports = {
         'plugin:jest/recommended'
     ],
     env: {
-        "node":  true,
+        "node": true,
     },
     rules: {
         // force semi-colons: disable semi and enable TS semi
@@ -19,5 +19,7 @@ module.exports = {
         "@typescript-eslint/semi": ["error"],
         // do not consider unused function parameters, as it may change semantics
         "@typescript-eslint/no-unused-vars": ["error", { "args": "none" }],
+        // allow explicit types even if inferrable
+        "@typescript-eslint/no-inferrable-types": "off",
     }
 };

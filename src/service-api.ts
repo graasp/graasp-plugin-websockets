@@ -17,12 +17,18 @@ import { ClientMessage, createErrorMessage, ServerMessage } from './interfaces/m
 import { MessageSerializer } from './interfaces/message-serializer';
 import { WebSocketChannels } from './ws-channels';
 
+/**
+ * Extend FastifyInstance class to decorate with WebSocketChannels instance when registered
+ */
 declare module 'fastify' {
     interface FastifyInstance {
         websocketChannels: WebSocketChannels<ClientMessage, ServerMessage>;
     }
 }
 
+/**
+ * Type definition for plugin options
+ */
 interface GraaspWebsocketsPluginOptions {
     prefix: string;
 }
@@ -43,6 +49,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
     const wsChannels = new WebSocketChannels(fastify.websocketServer, serdes);
 
+    // decorate main fastify instance with websocket channels instance
     fastify.decorate('websocketChannels', wsChannels);
 
     fastify.get(prefix, { websocket: true }, (connection, req) => {
