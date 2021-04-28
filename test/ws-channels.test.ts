@@ -62,6 +62,30 @@ describe('Server internal behavior', () => {
         });
     });
 
+    test("Client sending a disconnect message is removed", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        // we need to be informed when the client actually disconnects from the server side:
+        return new Promise<void>((resolve, reject) => {
+            createWsFastifyInstance(config, (client, server) => {
+                // we intercept server.on("connection") and add a close listener to resolve when client disconnects
+                client.addEventListener("message", () => {
+                    // after client disconnected, it should be unregistered
+                    expect(server.websocketChannels.subscriptions.size).toEqual(0);
+                    server.close();
+                    // test finishes here
+                    resolve();
+                });
+            }).then(server => {
+                createWsClient(config).then(client => {
+                    // after client connected, it should be registered
+                    expect(server.websocketChannels.subscriptions.size).toEqual(1);
+                    clientSend(client, { realm: "notif", action: "disconnect" });
+                    client.close();
+                });
+            });
+        });
+    });
+
     test("Client with broken connection is unregistered by heartbeat", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         const { channels, wss } = createWsChannels(config, () => { /* noop */ }, 100);
@@ -76,6 +100,56 @@ describe('Server internal behavior', () => {
         clients.forEach(client => client.close());
         wss.close();
     });
+
+    test("Client that is removed is also deleted from channel subscribers", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        // we need to be informed when the client actually disconnects from the server side:
+        return new Promise<void>((resolve, reject) => {
+            createWsFastifyInstance(config, (client, server) => {
+                // add a message listener to check if it was subscribed correctly
+                client.addEventListener("message", () => {
+                    expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
+                });
+                // add a close listener to resolve when client disconnects
+                client.addEventListener("close", () => {
+                    // after client closed, channels should not see it as subscriber anymore
+                    expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(0);
+                    server.close();
+                    // test finishes here
+                    resolve();
+                });
+            }).then(server => {
+                server.websocketChannels.channelCreate('a');
+                createWsClient(config).then(client => {
+                    // register to some channels
+                    clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+                    client.close();
+                });
+            });
+        });
+    });
+
+    test("Removing a channel with subscribers removes subscription from them", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        return new Promise<void>((resolve, reject) => {
+            createWsFastifyInstance(config, (client, server) => {
+                // server receives subscription
+                client.addEventListener("message", () => {
+                    expect(server.websocketChannels.subscriptions.get(client)?.subscriptions.size).toEqual(1);
+                    server.websocketChannels.channelDelete("a");
+                    expect(server.websocketChannels.subscriptions.get(client)?.subscriptions.size).toEqual(0);
+                    server.close();
+                    resolve();
+                });
+            }).then(server => {
+                server.websocketChannels.channelCreate('a');
+                createWsClient(config).then(client => {
+                    clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+                    client.close();
+                });
+            });
+        });
+    });
 });
 
 describe('Client requests are handled', () => {
@@ -87,6 +161,7 @@ describe('Client requests are handled', () => {
     beforeAll(async () => {
         testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         testEnv.server = await createWsFastifyInstance(testEnv.config);
+        testEnv.server.websocketChannels.channelCreate('1');
     });
 
     test("Client sending an ill-formed request receives an error message", async () => {
@@ -104,6 +179,83 @@ describe('Client requests are handled', () => {
         client.send(JSON.stringify(msg));
         client.close();
         return test;
+    });
+
+    test("Client using subscribeOnly on multiple channels only receives from last", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        return new Promise<void>((resolve, reject) => {
+            createWsFastifyInstance(config, (client, server) => {
+                let msgCounter = 0;
+                // add a message listener to check if it was subscribed correctly
+                client.addEventListener("message", (data) => {
+                    msgCounter += 1;
+                    // server got all the messages
+                    if (msgCounter === 4) {
+                        server.websocketChannels.channelSend("1", createPayloadMessage("hello1"));
+                        server.websocketChannels.channelSend("2", createPayloadMessage("hello2"));
+                        server.websocketChannels.channelSend("3", createPayloadMessage("hello3"));
+                        server.websocketChannels.channelSend("4", createPayloadMessage("hello4"));
+                    }
+                });
+            }).then(server => {
+                server.websocketChannels.channelCreate("1");
+                server.websocketChannels.channelCreate("2");
+                server.websocketChannels.channelCreate("3");
+                server.websocketChannels.channelCreate("4");
+
+                createWsClient(config).then(client => {
+                    clientWait(client, 1).then(data => {
+                        expect(data).toStrictEqual({
+                            realm: "notif",
+                            body: "hello4",
+                        });
+                        client.close();
+                        server.close();
+                        resolve();
+                    });
+                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "1" });
+                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "2" });
+                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "3" });
+                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "4" });
+                });
+            });
+        });
+    });
+
+    test("Client unsubscribing from a channel does not receive messages anymore", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        return new Promise<void>((resolve, reject) => {
+            createWsFastifyInstance(config, (client, server) => {
+                let msgCounter = 0;
+                // add a message listener to check if all messages were received
+                client.addEventListener("message", (data) => {
+                    msgCounter += 1;
+                    if (msgCounter === 2) {
+                        server.websocketChannels.channelSend("1", createPayloadMessage("you should not receive me"));
+                    }
+                    if (msgCounter === 3) {
+                        server.websocketChannels.channelSend("1", createPayloadMessage("hello again"));
+                    }
+                });
+            }).then(server => {
+                server.websocketChannels.channelCreate("1");
+
+                createWsClient(config).then(client => {
+                    clientWait(client, 1).then(data => {
+                        expect(data).toStrictEqual({
+                            realm: "notif",
+                            body: "hello again",
+                        });
+                        client.close();
+                        server.close();
+                        resolve();
+                    });
+                    clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+                    clientSend(client, { realm: "notif", action: "unsubscribe", channel: "1" });
+                    clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+                });
+            });
+        });
     });
 
     afterAll(() => {
