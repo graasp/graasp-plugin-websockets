@@ -51,6 +51,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
     fastify.decorate('websocketChannels', wsChannels);
 
+    fastify.addHook('preHandler', fastify.validateSession);
+
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;
 
