@@ -21,19 +21,19 @@ describe('Server internal behavior', () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         const { channels: server, wss } = createWsChannels(config);
         expect(server.channels.size).toEqual(0);
-        server.channelCreate("hello");
+        server.channelCreate("hello", false);
         expect(server.channels.size).toEqual(1);
-        expect(server.channels.get("hello")).toEqual({ name: "hello", subscribers: new Set() });
-        server.channelCreate("world");
+        expect(server.channels.get("hello")).toEqual({ name: "hello", removeIfEmpty: false, subscribers: new Set() });
+        server.channelCreate("world", false);
         expect(server.channels.size).toEqual(2);
-        expect(server.channels.get("hello")).toEqual({ name: "hello", subscribers: new Set() });
-        expect(server.channels.get("world")).toEqual({ name: "world", subscribers: new Set() });
+        expect(server.channels.get("hello")).toEqual({ name: "hello", removeIfEmpty: false, subscribers: new Set() });
+        expect(server.channels.get("world")).toEqual({ name: "world", removeIfEmpty: false, subscribers: new Set() });
         server.channelDelete("unknown");
         expect(server.channels.size).toEqual(2);
         server.channelDelete("hello");
         expect(server.channels.size).toEqual(1);
         expect(server.channels.get("hello")).toEqual(undefined);
-        expect(server.channels.get("world")).toEqual({ name: "world", subscribers: new Set() });
+        expect(server.channels.get("world")).toEqual({ name: "world", removeIfEmpty: false, subscribers: new Set() });
         server.channelDelete("world");
         expect(server.channels.size).toEqual(0);
         wss.close();
@@ -101,6 +101,17 @@ describe('Server internal behavior', () => {
         wss.close();
     });
 
+    test("Empty channel with removeIfEmpty flag is eventually removed by heartbeat", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels, wss } = createWsChannels(config, () => { /* noop */ }, 100);
+        channels.channelCreate("test", true);
+        expect(channels.channels.size).toEqual(1);
+        await waitForExpect(() => {
+            expect(channels.channels.size).toEqual(0);
+        });
+        wss.close();
+    });
+
     test("Client that is removed is also deleted from channel subscribers", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         // we need to be informed when the client actually disconnects from the server side:
@@ -119,7 +130,7 @@ describe('Server internal behavior', () => {
                     resolve();
                 });
             }).then(server => {
-                server.websocketChannels.channelCreate('a');
+                server.websocketChannels.channelCreate('a', false);
                 createWsClient(config).then(client => {
                     // register to some channels
                     clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
@@ -142,7 +153,7 @@ describe('Server internal behavior', () => {
                     resolve();
                 });
             }).then(server => {
-                server.websocketChannels.channelCreate('a');
+                server.websocketChannels.channelCreate('a', false);
                 createWsClient(config).then(client => {
                     clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
                     client.close();
@@ -161,7 +172,7 @@ describe('Client requests are handled', () => {
     beforeAll(async () => {
         testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         testEnv.server = await createWsFastifyInstance(testEnv.config);
-        testEnv.server.websocketChannels.channelCreate('1');
+        testEnv.server.websocketChannels.channelCreate('1', false);
     });
 
     test("Client sending an ill-formed request receives an error message", async () => {
@@ -198,10 +209,10 @@ describe('Client requests are handled', () => {
                     }
                 });
             }).then(server => {
-                server.websocketChannels.channelCreate("1");
-                server.websocketChannels.channelCreate("2");
-                server.websocketChannels.channelCreate("3");
-                server.websocketChannels.channelCreate("4");
+                server.websocketChannels.channelCreate("1", false);
+                server.websocketChannels.channelCreate("2", false);
+                server.websocketChannels.channelCreate("3", false);
+                server.websocketChannels.channelCreate("4", false);
 
                 createWsClient(config).then(client => {
                     clientWait(client, 1).then(data => {
@@ -238,7 +249,7 @@ describe('Client requests are handled', () => {
                     }
                 });
             }).then(server => {
-                server.websocketChannels.channelCreate("1");
+                server.websocketChannels.channelCreate("1", false);
 
                 createWsClient(config).then(client => {
                     clientWait(client, 1).then(data => {
@@ -280,8 +291,8 @@ describe('Channel messages sent by server are received by clients', () => {
 
         // create some channels
         const channels = testEnv.server.websocketChannels;
-        channels.channelCreate('1');
-        channels.channelCreate('2');
+        channels.channelCreate('1', false);
+        channels.channelCreate('2', false);
 
         const numClients = 5;
 

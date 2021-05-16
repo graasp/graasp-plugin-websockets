@@ -12,14 +12,17 @@ import { MessageSerializer } from './interfaces/message-serializer';
  * Represents a WebSocket channel which clients can subscribe to
  * @member name Name of the channel
  * @member subscribers Subscribers to the channel
+ * @member removeIfEmpty whether this channel will eventually be garbage collected when empty
  */
 class Channel<ServerMessageType>{
     readonly name: string;
     readonly subscribers: Set<WebSocket>;
+    readonly removeIfEmpty: boolean;
 
-    constructor(name: string) {
+    constructor(name: string, removeIfEmpty: boolean) {
         this.name = name;
         this.subscribers = new Set();
+        this.removeIfEmpty = removeIfEmpty;
     }
 
     send(message: ServerMessageType, sendFn: (client: WebSocket, msg: ServerMessageType) => void) {
@@ -116,6 +119,13 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
                 client.isAlive = false;
                 ws.ping();
             });
+            // find empty channels eligible for garbage collection
+            this.channels.forEach((channel, name) => {
+                if (channel.removeIfEmpty && channel.subscribers.size === 0) {
+                    this.channelDelete(name);
+                    console.log(`graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`);
+                }
+            });
         }, heartbeatInterval);
 
         // cleanup if server closes
@@ -207,9 +217,10 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
     /**
      * Create a new channel given a channel name
      * @param channelName name of the new channel
+     * @param removeIfEmpty whether this channel will eventually be garbage collected when empty
      */
-    channelCreate(channelName: string): void {
-        const channel = new Channel<ServerMessageType>(channelName);
+    channelCreate(channelName: string, removeIfEmpty: boolean): void {
+        const channel = new Channel<ServerMessageType>(channelName, removeIfEmpty);
         this.channels.set(channelName, channel);
     }
 
