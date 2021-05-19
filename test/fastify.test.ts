@@ -7,7 +7,7 @@
  */
 
 import fws from 'fastify-websocket';
-import { createDefaultLocalConfig, createFastifyInstance, createWsClients, PortGenerator } from './test-utils';
+import { createDefaultLocalConfig, createFastifyInstance, createWsClient, PortGenerator } from './test-utils';
 
 const portGen = new PortGenerator(3000);
 
@@ -46,12 +46,9 @@ test('fastify validates body response instead of request on GET endpoint', async
                 /* noop */
             });
         }).then(_ => {
-            createWsClients(config, 1, (client, done) => {
-                client.on('open', () => {
-                    client.send(JSON.stringify(message));
-                    client.close();
-                    done();
-                });
+            createWsClient(config).then(client => {
+                client.send(JSON.stringify(message));
+                client.close();
             });
         });
     });

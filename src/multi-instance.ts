@@ -135,9 +135,9 @@ class MultiInstanceChannelsBroker {
      * Closes the MultiInstanceChannelsBroker
      * MUST be called when the fastify instance stops!
      */
-    close(): void {
+    async close(): Promise<void> {
         // cleanup open resources
-        this.sub.unsubscribe("notif");
+        await this.sub.unsubscribe("notif");
         this.sub.disconnect();
         this.pub.disconnect();
     }
