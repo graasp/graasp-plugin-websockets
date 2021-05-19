@@ -63,9 +63,6 @@ const redisSerdes = {
     parse: ajv.compileParser(redisMessageSchema),
 };
 
-// Redis channel on which all RedisMessages are sent
-const redisNotifChannel = "notif";
-
 
 // Helper to create a redis client instance
 function createRedisClientInstance(redisConfig?: Redis.RedisOptions): Redis.Redis {
@@ -99,18 +96,18 @@ class MultiInstanceChannelsBroker {
         this.sub = createRedisClientInstance(redisConfig);
         this.pub = createRedisClientInstance(redisConfig);
 
-        this.sub.subscribe(redisNotifChannel, (err, count) => {
+        this.sub.subscribe(config.redis.notifChannel, (err, count) => {
             if (err) {
-                console.log(`graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${redisNotifChannel}, reason: ${err.message}`);
+                console.log(`graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${config.redis.notifChannel}, reason: ${err.message}`);
                 console.log(`\t${err}`);
             }
         });
 
         this.sub.on("message", (channel, message) => {
-            if (channel === redisNotifChannel) {
+            if (channel === config.redis.notifChannel) {
                 const msg = redisSerdes.parse(message);
                 if (msg === undefined) {
-                    console.log(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${redisNotifChannel}": ${message}`);
+                    console.log(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${config.redis.notifChannel}": ${message}`);
                 } else {
                     // forward notification to respective channel
                     if (msg.channel === "broadcast") {
@@ -131,7 +128,7 @@ class MultiInstanceChannelsBroker {
     dispatch(notif: ServerMessage, channel: string | "broadcast"): void {
         const msg = createRedisMessage(notif, channel);
         const json = redisSerdes.serialize(msg);
-        this.pub.publish(channel, json);
+        this.pub.publish(config.redis.notifChannel, json);
     }
 
     /**
