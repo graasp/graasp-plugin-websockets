@@ -13,6 +13,7 @@ import { ClientMessageSerializer } from '../client/interfaces/client-message-ser
 import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
+import { MultiInstanceChannelsBroker } from '../src/multi-instance';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
 
@@ -80,6 +81,23 @@ function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebS
     return {
         channels: wsChannels,
         wss: server,
+    };
+}
+
+/**
+ * Creates a multi-instance broker on top of a barebone websocket server
+ * @param config TestConfig for this server
+ * @param clientConnOverrides Function called when clients connect to server: test can inject behaviour on this event
+ * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
+ * @returns Object containing multi-instance broker, channels server and underlying ws server
+ */
+function createMultiInstanceBroker(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }, heartbeatInterval: number = 30000): { broker: MultiInstanceChannelsBroker, channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
+    const { channels, wss } = createWsChannels(config, clientConnOverrides, heartbeatInterval);
+    const channelsBroker = new MultiInstanceChannelsBroker(channels);
+    return {
+        broker: channelsBroker,
+        channels: channels,
+        wss: wss,
     };
 }
 
@@ -212,4 +230,4 @@ function clientSend(client: WebSocket, data: ClientMessage): void {
 }
 
 
-export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };
+export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, createMultiInstanceBroker, clientWait, clientsWait, clientSend };

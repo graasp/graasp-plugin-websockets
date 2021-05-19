@@ -41,49 +41,27 @@ describe('Server internal behavior', () => {
 
     test("Client connecting to server is registered and then removed on close", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        // we need to be informed when the client actually disconnects from the server side:
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                // we intercept server.on("connection") and add a close listener to resolve when client disconnects
-                client.addEventListener("close", () => {
-                    // after client closed, it should be unregistered
-                    expect(server.websocketChannels.subscriptions.size).toEqual(0);
-                    server.close();
-                    // test finishes here
-                    resolve();
-                });
-            }).then(server => {
-                createWsClient(config).then(client => {
-                    // after client connected, it should be registered
-                    expect(server.websocketChannels.subscriptions.size).toEqual(1);
-                    client.close();
-                });
-            });
+        const server = await createWsFastifyInstance(config);
+        const client = await createWsClient(config);
+        expect(server.websocketChannels.subscriptions.size).toEqual(1);
+        client.close();
+        await waitForExpect(() => {
+            expect(server.websocketChannels.subscriptions.size).toEqual(0);
         });
+        await server.close();
     });
 
     test("Client sending a disconnect message is removed", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        // we need to be informed when the client actually disconnects from the server side:
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                // we intercept server.on("connection") and add a close listener to resolve when client disconnects
-                client.addEventListener("message", () => {
-                    // after client disconnected, it should be unregistered
-                    expect(server.websocketChannels.subscriptions.size).toEqual(0);
-                    server.close();
-                    // test finishes here
-                    resolve();
-                });
-            }).then(server => {
-                createWsClient(config).then(client => {
-                    // after client connected, it should be registered
-                    expect(server.websocketChannels.subscriptions.size).toEqual(1);
-                    clientSend(client, { realm: "notif", action: "disconnect" });
-                    client.close();
-                });
-            });
+        const server = await createWsFastifyInstance(config);
+        const client = await createWsClient(config);
+        expect(server.websocketChannels.subscriptions.size).toEqual(1);
+        clientSend(client, { realm: "notif", action: "disconnect" });
+        await waitForExpect(() => {
+            expect(server.websocketChannels.subscriptions.size).toEqual(0);
         });
+        client.close();
+        await server.close();
     });
 
     test("Client with broken connection is unregistered by heartbeat", async () => {
@@ -114,52 +92,50 @@ describe('Server internal behavior', () => {
 
     test("Client that is removed is also deleted from channel subscribers", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        // we need to be informed when the client actually disconnects from the server side:
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                // add a message listener to check if it was subscribed correctly
-                client.addEventListener("message", () => {
-                    expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
-                });
-                // add a close listener to resolve when client disconnects
-                client.addEventListener("close", () => {
-                    // after client closed, channels should not see it as subscriber anymore
-                    expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(0);
-                    server.close();
-                    // test finishes here
-                    resolve();
-                });
-            }).then(server => {
-                server.websocketChannels.channelCreate('a', false);
-                createWsClient(config).then(client => {
-                    // register to some channels
-                    clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
-                    client.close();
-                });
-            });
+        const server = await createWsFastifyInstance(config);
+        server.websocketChannels.channelCreate('a', false);
+        const client = await createWsClient(config);
+
+        // subscribe to channel "a" and await ack
+        const ack = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const ackMsg = await ack;
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
+
+        client.close();
+        await waitForExpect(() => {
+            // after client closed, channels should not see it as subscriber anymore
+            expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(0);
         });
+        await server.close();
     });
 
     test("Removing a channel with subscribers removes subscription from them", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                // server receives subscription
-                client.addEventListener("message", () => {
-                    expect(server.websocketChannels.subscriptions.get(client)?.subscriptions.size).toEqual(1);
-                    server.websocketChannels.channelDelete("a");
-                    expect(server.websocketChannels.subscriptions.get(client)?.subscriptions.size).toEqual(0);
-                    server.close();
-                    resolve();
-                });
-            }).then(server => {
-                server.websocketChannels.channelCreate('a', false);
-                createWsClient(config).then(client => {
-                    clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
-                    client.close();
-                });
-            });
+        const server = await createWsFastifyInstance(config);
+        server.websocketChannels.channelCreate('a', false);
+        const client = await createWsClient(config);
+
+        // subscribe to channel "a" and await ack
+        const ack = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const ackMsg = await ack;
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
+
+        server.websocketChannels.subscriptions.forEach(client => {
+            expect(client.subscriptions.size).toEqual(1);
         });
+
+        server.websocketChannels.channelDelete("a");
+
+        server.websocketChannels.subscriptions.forEach(client => {
+            expect(client.subscriptions.size).toEqual(0);
+        });
+
+        client.close();
+        await server.close();
     });
 });
 
@@ -178,95 +154,102 @@ describe('Client requests are handled', () => {
     test("Client sending an ill-formed request receives an error message", async () => {
         const msg = { wrong: "format" };
         const client = await createWsClient(testEnv.config!);
-        const test = clientWait(client, 1).then(data => {
-            expect(data).toStrictEqual({
-                realm: "notif",
-                error: {
-                    "name": "Invalid request message",
-                    "message": "Request message format was not understood by the server",
-                },
-            });
-        });
+        const response = clientWait(client, 1);
         client.send(JSON.stringify(msg));
+        const data = await response;
+        expect(data).toStrictEqual({
+            realm: "notif",
+            error: {
+                "name": "Invalid request message",
+                "message": "Request message format was not understood by the server",
+            },
+        });
         client.close();
-        return test;
     });
 
     test("Client using subscribeOnly on multiple channels only receives from last", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                let msgCounter = 0;
-                // add a message listener to check if it was subscribed correctly
-                client.addEventListener("message", (data) => {
-                    msgCounter += 1;
-                    // server got all the messages
-                    if (msgCounter === 4) {
-                        server.websocketChannels.channelSend("1", createPayloadMessage("hello1"));
-                        server.websocketChannels.channelSend("2", createPayloadMessage("hello2"));
-                        server.websocketChannels.channelSend("3", createPayloadMessage("hello3"));
-                        server.websocketChannels.channelSend("4", createPayloadMessage("hello4"));
-                    }
-                });
-            }).then(server => {
-                server.websocketChannels.channelCreate("1", false);
-                server.websocketChannels.channelCreate("2", false);
-                server.websocketChannels.channelCreate("3", false);
-                server.websocketChannels.channelCreate("4", false);
+        const server = await createWsFastifyInstance(config);
+        server.websocketChannels.channelCreate("1", false);
+        server.websocketChannels.channelCreate("2", false);
+        server.websocketChannels.channelCreate("3", false);
+        server.websocketChannels.channelCreate("4", false);
 
-                createWsClient(config).then(client => {
-                    clientWait(client, 1).then(data => {
-                        expect(data).toStrictEqual({
-                            realm: "notif",
-                            body: "hello4",
-                        });
-                        client.close();
-                        server.close();
-                        resolve();
-                    });
-                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "1" });
-                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "2" });
-                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "3" });
-                    clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "4" });
-                });
-            });
+        // subscribe only 4 times in a row to 4 channels
+        const client = await createWsClient(config);
+        const acks = clientWait(client, 4);
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "1" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "2" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "3" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "4" });
+        const ackMsgs = await acks;
+        const expectedAckMsgs = ["1", "2", "3", "4"].map(c => ({ body: { status: "success", action: "subscribeOnly", channel: c } }));
+        expect(ackMsgs).toMatchObject(expectedAckMsgs);
+
+        // wait for a single message: should only received from channel "4"
+        const waitMsg = clientWait(client, 1);
+        server.websocketChannels.channelSend("1", createPayloadMessage("hello1"));
+        server.websocketChannels.channelSend("2", createPayloadMessage("hello2"));
+        server.websocketChannels.channelSend("3", createPayloadMessage("hello3"));
+        server.websocketChannels.channelSend("4", createPayloadMessage("hello4"));
+        const data = await waitMsg;
+        expect(data).toStrictEqual({
+            realm: "notif",
+            body: "hello4",
         });
+
+        client.close();
+        await server.close();
     });
 
     test("Client unsubscribing from a channel does not receive messages anymore", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        return new Promise<void>((resolve, reject) => {
-            createWsFastifyInstance(config, (client, server) => {
-                let msgCounter = 0;
-                // add a message listener to check if all messages were received
-                client.addEventListener("message", (data) => {
-                    msgCounter += 1;
-                    if (msgCounter === 2) {
-                        server.websocketChannels.channelSend("1", createPayloadMessage("you should not receive me"));
-                    }
-                    if (msgCounter === 3) {
-                        server.websocketChannels.channelSend("1", createPayloadMessage("hello again"));
-                    }
-                });
-            }).then(server => {
-                server.websocketChannels.channelCreate("1", false);
+        const server = await createWsFastifyInstance(config);
+        server.websocketChannels.channelCreate("1", false);
+        const client = await createWsClient(config);
 
-                createWsClient(config).then(client => {
-                    clientWait(client, 1).then(data => {
-                        expect(data).toStrictEqual({
-                            realm: "notif",
-                            body: "hello again",
-                        });
-                        client.close();
-                        server.close();
-                        resolve();
-                    });
-                    clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
-                    clientSend(client, { realm: "notif", action: "unsubscribe", channel: "1" });
-                    clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
-                });
-            });
+        let ack, ackMsg;
+
+        // subscribe client to channel
+        ack = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+        ackMsg = await ack;
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "1" } });
+
+        // unsubscribe client from channel
+        ack = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "unsubscribe", channel: "1" });
+        ackMsg = await ack;
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "unsubscribe", channel: "1" } });
+
+        // expect next message to be ack for subscribing again, but NOT "you should not receive me"
+        ack = clientWait(client, 1);
+        server.websocketChannels.channelSend("1", createPayloadMessage("you should not receive me"));
+
+        // subscribe again client to channel
+        clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+        ackMsg = await ack;
+        expect(ackMsg).not.toMatchObject({
+            body: "you should not receive me",
         });
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "1" } });
+
+        // now next message should be "hello again"
+        const waitMsg = clientWait(client, 1);
+        server.websocketChannels.channelSend("1", createPayloadMessage("hello again"));
+        const data = await waitMsg;
+
+        expect(data).not.toMatchObject({
+            body: "you should not receive me",
+        });
+
+        expect(data).toStrictEqual({
+            realm: "notif",
+            body: "hello again",
+        });
+
+        client.close();
+        await server.close();
     });
 
     afterAll(() => {
@@ -295,88 +278,67 @@ describe('Channel messages sent by server are received by clients', () => {
         channels.channelCreate('2', false);
 
         const numClients = 5;
+        let ack;
 
         // spawn 5 clients and sub them to channel 1
-        testEnv.subs1 = await createWsClients(config, numClients, (client, done) => {
-            client.on('open', () => {
-                clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
-                done();
-            });
-        });
+        testEnv.subs1 = await createWsClients(config, numClients);
+        ack = clientsWait(testEnv.subs1, 1);
+        testEnv.subs1.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "1" }));
+        await ack;
 
         // spawn 5 clients and sub them to channel 2
-        testEnv.subs2 = await createWsClients(config, numClients, (client, done) => {
-            client.on('open', () => {
-                clientSend(client, { realm: "notif", action: "subscribe", channel: "2" });
-                done();
-            });
-        });
+        testEnv.subs2 = await createWsClients(config, numClients);
+        ack = clientsWait(testEnv.subs2, 1);
+        testEnv.subs2.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "2" }));
+        await ack;
 
         // spawn 5 clients and don't sub them
         testEnv.unsubs = await createWsClients(config, numClients);
     });
 
-    test("Clients subscribed to channel '1' all receive 'msg1'", () => {
+    test("Clients subscribed to channel '1' all receive 'msg1'", async () => {
         const msg = createPayloadMessage('msg1');
-        const test = clientsWait(testEnv.subs1!, 1).then(data => {
-            data.forEach(value => {
-                expect(value).toStrictEqual(msg);
-            });
-        });
+        const test = clientsWait(testEnv.subs1!, 1);
         testEnv.server!.websocketChannels.channelSend('1', msg);
-        return test;
+        const data = await test;
+        data.forEach(value => expect(value).toStrictEqual(msg));
     });
 
-    test("Clients subscribed to channel '2' all receive 'msg2", () => {
+    test("Clients subscribed to channel '2' all receive 'msg2", async () => {
         const msg = createPayloadMessage('msg2');
-        const test = clientsWait(testEnv.subs2!, 1).then(data => {
-            data.forEach(value => {
-                expect(value).toStrictEqual(msg);
-            });
-        });
+        const test = clientsWait(testEnv.subs2!, 1);
         testEnv.server!.websocketChannels.channelSend('2', msg);
-        return test;
+        const data = await test;
+        data.forEach(value => expect(value).toStrictEqual(msg));
     });
 
-    test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", () => {
+    test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", async () => {
         const hello2 = createPayloadMessage('hello2');
         const hello1 = createPayloadMessage('hello1');
-        // ESLint does not detect that the promise is combined into Promise.all below
-        // eslint-disable-next-line jest/valid-expect-in-promise
-        const test1 = clientsWait(testEnv.subs1!, 1).then(data => {
-            data.forEach(value => {
-                expect(value).toStrictEqual(hello1);
-            });
-        });
-        // ESLint does not detect that the promise is combined into Promise.all below
-        // eslint-disable-next-line jest/valid-expect-in-promise
-        const test2 = clientsWait(testEnv.subs2!, 1).then(data => {
-            data.forEach(value => {
-                expect(value).toStrictEqual(hello2);
-            });
-        });
+        const test1 = clientsWait(testEnv.subs1!, 1);
+        const test2 = clientsWait(testEnv.subs2!, 1);
         testEnv.server!.websocketChannels.channelSend('1', hello1);
         testEnv.server!.websocketChannels.channelSend('2', hello2);
-        return Promise.all([test1, test2]);
+        const data1 = await test1;
+        const data2 = await test2;
+        data1.forEach(value => expect(value).toStrictEqual(hello1));
+        data2.forEach(value => expect(value).toStrictEqual(hello2));
     });
 
     test("All clients receive broadcasts even if not subscribed to channels", async () => {
         const broadcastMsg = createPayloadMessage({ hello: "world" });
         const clientsShouldReceive = new Array<WebSocket>().concat(testEnv.subs1!, testEnv.subs2!, testEnv.unsubs!);
-        const test = clientsWait(clientsShouldReceive, 1).then(data => {
-            data.forEach(value => {
-                expect(value).toStrictEqual(broadcastMsg);
-            });
-        });
+        const test = clientsWait(clientsShouldReceive, 1);
         testEnv.server!.websocketChannels.broadcast(broadcastMsg);
-        return test;
+        const data = await test;
+        data.forEach(value => expect(value).toStrictEqual(broadcastMsg));
     });
 
 
-    afterAll(() => {
+    afterAll(async () => {
         testEnv.subs1!.forEach(client => client.close());
         testEnv.subs2!.forEach(client => client.close());
         testEnv.unsubs!.forEach(client => client.close());
-        testEnv.server!.close();
+        await testEnv.server!.close();
     });
 });

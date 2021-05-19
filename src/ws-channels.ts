@@ -25,10 +25,12 @@ class Channel<ServerMessageType>{
         this.removeIfEmpty = removeIfEmpty;
     }
 
-    send(message: ServerMessageType, sendFn: (client: WebSocket, msg: ServerMessageType) => void) {
+    send(message: ServerMessageType, sendFn: (client: WebSocket, msg: ServerMessageType) => boolean) {
+        let ret = true;
         this.subscribers.forEach(sub => {
-            sendFn(sub, message);
+            ret = ret && sendFn(sub, message);
         });
+        return ret;
     }
 }
 
@@ -139,10 +141,13 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param client WebSocket client to send to
      * @param message ServerMessage to transmit
      */
-    clientSend(client: WebSocket, message: ServerMessageType): void {
-        if (client.readyState === WebSocket.OPEN) {
+    clientSend(client: WebSocket, message: ServerMessageType): boolean {
+        if (client.readyState !== WebSocket.OPEN) {
+            return false;
+        } else {
             const serialized = this.serdes.serialize(message);
             client.send(serialized);
+            return true;
         }
     }
 
@@ -159,7 +164,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * Removes a client from the channels system
      * @param ws Client to remove, nothing will happen if the client is not registered
      */
-    clientRemove(ws: WebSocket): void {
+    clientRemove(ws: WebSocket): boolean {
         const client = this.subscriptions.get(ws);
         if (client !== undefined) {
             client.subscriptions.forEach(channel => {
@@ -167,7 +172,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
             });
             client.close();
         }
-        this.subscriptions.delete(ws);
+        return this.subscriptions.delete(ws);
     }
 
     /**
@@ -175,13 +180,17 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param ws client to subscribe to the channel
      * @param channelName name of the channel
      */
-    clientSubscribe(ws: WebSocket, channelName: string): void {
+    clientSubscribe(ws: WebSocket, channelName: string): boolean {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.add(ws);
             const client = this.subscriptions.get(ws);
-            if (client !== undefined) client.subscriptions.add(channel);
+            if (client !== undefined) {
+                client.subscriptions.add(channel);
+                return true;
+            }
         }
+        return false;
     }
 
     /**
@@ -189,7 +198,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param ws client to subscribe to the channel
      * @param channelName name of the channel
      */
-    clientSubscribeOnly(ws: WebSocket, channelName: string): void {
+    clientSubscribeOnly(ws: WebSocket, channelName: string): boolean {
         const client = this.subscriptions.get(ws);
         if (client !== undefined) {
             client.subscriptions.forEach(channel => {
@@ -197,7 +206,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
                 client.subscriptions.delete(channel);
             });
         }
-        this.clientSubscribe(ws, channelName);
+        return this.clientSubscribe(ws, channelName);
     }
 
     /**
@@ -205,13 +214,16 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * @param ws client to unsubscribe from channel
      * @param channelName name of the channel
      */
-    clientUnsubscribe(ws: WebSocket, channelName: string): void {
+    clientUnsubscribe(ws: WebSocket, channelName: string): boolean {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.delete(ws);
             const client = this.subscriptions.get(ws);
-            if (client !== undefined) client.subscriptions.delete(channel);
+            if (client !== undefined) {
+                return client.subscriptions.delete(channel);
+            }
         }
+        return false;
     }
 
     /**
@@ -228,7 +240,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * Delete a channel given its name
      * @param channelName name of the channel
      */
-    channelDelete(channelName: string): void {
+    channelDelete(channelName: string): boolean {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
             channel.subscribers.forEach(sub => {
@@ -237,27 +249,33 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
                     client.subscriptions.delete(channel);
                 }
             });
-            this.channels.delete(channelName);
+            return this.channels.delete(channelName);
         }
+        return false;
     }
 
     /**
      * Send a message on a given channel
      * @param channelName name of the channel to send a message on
      */
-    channelSend(channelName: string, message: ServerMessageType): void {
+    channelSend(channelName: string, message: ServerMessageType): boolean {
         const channel = this.channels.get(channelName);
-        if (channel !== undefined) channel.send(message, (client, message) => this.clientSend(client, message));
+        if (channel !== undefined) {
+            return channel.send(message, (client, message) => this.clientSend(client, message));
+        }
+        return false;
     }
 
     /**
      * Sends an object message to all connected clients
      * @param message Object to broadcast to everyone
      */
-    broadcast(message: ServerMessageType): void {
+    broadcast(message: ServerMessageType): boolean {
+        let ret = true;
         this.wsServer.clients.forEach(client => {
-            this.clientSend(client, message);
+            ret = ret && this.clientSend(client, message);
         });
+        return ret;
     }
 }
 

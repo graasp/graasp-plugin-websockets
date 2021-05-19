@@ -13,8 +13,9 @@ import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { ClientMessage, createErrorMessage, ServerMessage } from './interfaces/message';
+import { ClientMessage, createErrorMessage, createPayloadMessage, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
+import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
 
 /**
@@ -52,6 +53,9 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     // decorate main fastify instance with websocket channels instance
     fastify.decorate('websocketChannels', wsChannels);
 
+    // multi-instance handler
+    const channelsBroker = new MultiInstanceChannelsBroker(wsChannels);
+
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;
 
@@ -79,15 +83,24 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribe": {
-                        wsChannels.clientSubscribe(client, request.channel);
+                        const msg = (wsChannels.clientSubscribe(client, request.channel)) ?
+                            createPayloadMessage({ status: "success", action: "subscribe", channel: request.channel }) :
+                            createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
+                        wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "subscribeOnly": {
-                        wsChannels.clientSubscribeOnly(client, request.channel);
+                        const msg = (wsChannels.clientSubscribeOnly(client, request.channel)) ?
+                            createPayloadMessage({ status: "success", action: "subscribeOnly", channel: request.channel }) :
+                            createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
+                        wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "unsubscribe": {
-                        wsChannels.clientUnsubscribe(client, request.channel);
+                        const msg = (wsChannels.clientUnsubscribe(client, request.channel)) ?
+                            createPayloadMessage({ status: "success", action: "unsubscribe", channel: request.channel }) :
+                            createErrorMessage({ name: "Server error", message: "Unable to unsubscribe from channel " + request.channel });
+                        wsChannels.clientSend(client, msg);
                         break;
                     }
                 }
@@ -98,6 +111,12 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         client.on('close', (code, reason) => {
             wsChannels.clientRemove(client);
         });
+    });
+
+    // cleanup on server close
+    fastify.addHook("onClose", (instance, done) => {
+        channelsBroker.close();
+        done();
     });
 };
 
