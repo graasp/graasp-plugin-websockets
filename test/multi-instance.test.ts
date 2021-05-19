@@ -7,7 +7,7 @@
  */
 
 import { createPayloadMessage } from "../src/interfaces/message";
-import { clientSend, clientWait, createDefaultLocalConfig, createMultiInstanceBroker, createWsClient, PortGenerator } from "./test-utils";
+import { clientSend, clientWait, createDefaultLocalConfig, createWsClient, createWsFastifyInstance, PortGenerator } from "./test-utils";
 
 const portGen = new PortGenerator(5000);
 
@@ -16,12 +16,12 @@ test('Message sent on a multi-instance broker is received by all instances', asy
     const config2 = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
     // create 2 independent instance of channels broker
-    const instance1 = createMultiInstanceBroker(config1);
-    const instance2 = createMultiInstanceBroker(config2);
+    const instance1 = await createWsFastifyInstance(config1);
+    const instance2 = await createWsFastifyInstance(config2);
 
     // create "test" channel locally on both
-    instance1.channels.channelCreate("test", false);
-    instance2.channels.channelCreate("test", false);
+    instance1.websocketChannels.channelCreate("test", false);
+    instance2.websocketChannels.channelCreate("test", false);
 
     const client1 = await createWsClient(config1);
     const client2 = await createWsClient(config2);
@@ -39,7 +39,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
     // broker dispatch should be received by both clients
     const test1 = clientWait(client1, 1);
     const test2 = clientWait(client2, 1);
-    instance1.broker.dispatch(createPayloadMessage("hello"), "test");
+    instance1.websocketChannelsBroker.dispatch(createPayloadMessage("hello"), "test");
     const values = await Promise.all([test1, test2]);
     values.forEach(value => {
         expect(value).toStrictEqual("hello");
@@ -47,8 +47,6 @@ test('Message sent on a multi-instance broker is received by all instances', asy
 
     client1.close();
     client2.close();
-    instance1.broker.close();
-    instance2.broker.close();
-    instance1.wss.close();
-    instance2.wss.close();
+    await instance1.close();
+    await instance2.close();
 });

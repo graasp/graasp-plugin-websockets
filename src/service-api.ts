@@ -24,6 +24,7 @@ import { WebSocketChannels } from './ws-channels';
 declare module 'fastify' {
     interface FastifyInstance {
         websocketChannels: WebSocketChannels<ClientMessage, ServerMessage>;
+        websocketChannelsBroker: MultiInstanceChannelsBroker;
     }
 }
 
@@ -55,6 +56,9 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
     // multi-instance handler
     const channelsBroker = new MultiInstanceChannelsBroker(wsChannels);
+
+    // decorate main fastify instance with multi-instance websocket channels broker
+    fastify.decorate('websocketChannelsBroker', channelsBroker);
 
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;

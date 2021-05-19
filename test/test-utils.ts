@@ -13,7 +13,6 @@ import { ClientMessageSerializer } from '../client/interfaces/client-message-ser
 import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
-import { MultiInstanceChannelsBroker } from '../src/multi-instance';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
 
@@ -61,17 +60,15 @@ class PortGenerator {
 /**
  * Create a barebone websocket server and decorate it with the channels abstraction
  * @param config TestConfig for this server
- * @param clientConnOverrides Function called when clients connect to server: test can inject behaviour on this event
  * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }, heartbeatInterval: number = 30000): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
+function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
     const server = new WebSocket.Server({ port: config.port });
     const wsChannels = new WebSocketChannels(server, serverSerdes, heartbeatInterval);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
-        clientConnOverrides(ws);
     });
 
     server.on('error', err => {
@@ -81,23 +78,6 @@ function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebS
     return {
         channels: wsChannels,
         wss: server,
-    };
-}
-
-/**
- * Creates a multi-instance broker on top of a barebone websocket server
- * @param config TestConfig for this server
- * @param clientConnOverrides Function called when clients connect to server: test can inject behaviour on this event
- * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
- * @returns Object containing multi-instance broker, channels server and underlying ws server
- */
-function createMultiInstanceBroker(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }, heartbeatInterval: number = 30000): { broker: MultiInstanceChannelsBroker, channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
-    const { channels, wss } = createWsChannels(config, clientConnOverrides, heartbeatInterval);
-    const channelsBroker = new MultiInstanceChannelsBroker(channels);
-    return {
-        broker: channelsBroker,
-        channels: channels,
-        wss: wss,
     };
 }
 
@@ -127,17 +107,13 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
 /**
  * Creates a fastify server in which graasp-websockets plugin was registered
  * @param config TestConfig for this server
- * @param clientConnOverrides Function called when clients connect to server: test can inject behaviour on this event
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: TestConfig, clientConnOverrides: (client: WebSocket, server: FastifyInstance) => void = _ => { /* noop */ }): Promise<FastifyInstance> {
+async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInstance> {
     return createFastifyInstance(config, async instance => {
+        // plugin must be registered inside this function parameter as it cannot be
+        // added after the instance has already booted
         await instance.register(graaspWebSockets, { prefix: config.prefix });
-
-        // plug in debug hooks
-        instance.websocketServer.addListener('connection', ws => {
-            clientConnOverrides(ws, instance);
-        });
     });
 }
 
@@ -153,14 +129,12 @@ function createConnUrl(config: TestConfig): string {
 /**
  * Create a barebone websocket client
  * @param config TestConfig for this server
- * @param setupFn Setup function for the client. The done callback parameter MUST be called inside!
  * @returns Promise of websocket client
  */
-async function createWsClient(config: TestConfig, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<WebSocket> {
+async function createWsClient(config: TestConfig): Promise<WebSocket> {
     return new Promise((resolve, reject) => {
         const client = new WebSocket(createConnUrl(config));
-        const done = () => resolve(client);
-        setupFn(client, done);
+        client.on("open", () => resolve(client));
     });
 }
 
@@ -168,11 +142,10 @@ async function createWsClient(config: TestConfig, setupFn: (ws: WebSocket, done:
  * Create N barebone websocket clients
  * @param config TestConfig for this server
  * @param numberClients Number of websocket clients to spawn
- * @param setupFn Setup function passed to each of the N clients, the done callback parameter MUST be called inside!
  * @returns Promise of Array of N websocket clients
  */
-async function createWsClients(config: TestConfig, numberClients: number, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<Array<WebSocket>> {
-    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config, setupFn));
+async function createWsClients(config: TestConfig, numberClients: number): Promise<Array<WebSocket>> {
+    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config));
     return Promise.all(clients);
 }
 
@@ -230,4 +203,4 @@ function clientSend(client: WebSocket, data: ClientMessage): void {
 }
 
 
-export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, createMultiInstanceBroker, clientWait, clientsWait, clientSend };
+export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };

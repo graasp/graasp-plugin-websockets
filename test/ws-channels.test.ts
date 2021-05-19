@@ -66,7 +66,7 @@ describe('Server internal behavior', () => {
 
     test("Client with broken connection is unregistered by heartbeat", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        const { channels, wss } = createWsChannels(config, () => { /* noop */ }, 100);
+        const { channels, wss } = createWsChannels(config, 100);
         const clients = await createWsClients(config, 2);
         expect(channels.subscriptions.size).toEqual(2);
         // forcefully close client 0
@@ -81,7 +81,7 @@ describe('Server internal behavior', () => {
 
     test("Empty channel with removeIfEmpty flag is eventually removed by heartbeat", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-        const { channels, wss } = createWsChannels(config, () => { /* noop */ }, 100);
+        const { channels, wss } = createWsChannels(config, 100);
         channels.channelCreate("test", true);
         expect(channels.channels.size).toEqual(1);
         await waitForExpect(() => {

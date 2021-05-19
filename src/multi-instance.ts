@@ -113,7 +113,11 @@ class MultiInstanceChannelsBroker {
                     console.log(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${redisNotifChannel}": ${message}`);
                 } else {
                     // forward notification to respective channel
-                    this.wsChannels.channelSend(msg.channel, msg.notif);
+                    if (msg.channel === "broadcast") {
+                        this.wsChannels.broadcast(msg.notif);
+                    } else {
+                        this.wsChannels.channelSend(msg.channel, msg.notif);
+                    }
                 }
             }
         });
