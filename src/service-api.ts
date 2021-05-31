@@ -116,6 +116,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribeOnly": {
+                        // TODO: proper validation of channel before creating it
+                        if (!wsChannels.channels.has(request.channel)) {
+                            wsChannels.channelCreate(request.channel, true);
+                        }
+
                         const msg = (wsChannels.clientSubscribeOnly(client, request.channel)) ?
                             createPayloadMessage({ status: "success", action: "subscribeOnly", channel: request.channel }) :
                             createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
