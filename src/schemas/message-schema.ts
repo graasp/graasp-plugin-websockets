@@ -61,6 +61,9 @@ const serverMessageSchema: JTDSchemaType<ServerMessage> = {
             },
         },
         body: {},
+        channel: { type: "string" },
+        type: { enum: ["sharedItem", "childItem"] },
+        action: { enum: ["create", "delete"] }
     },
 };
 

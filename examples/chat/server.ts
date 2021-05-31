@@ -26,7 +26,7 @@ async function startServer() {
 
     const wsChannels = new WebSocketChannels(server.websocketServer, serdes);
 
-    wsChannels.channelCreate('chat');
+    wsChannels.channelCreate('chat', false);
 
     server.get('/chat', { websocket: true }, (conn, req) => {
         const client = conn.socket;

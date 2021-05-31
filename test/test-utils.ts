@@ -59,15 +59,16 @@ class PortGenerator {
 
 /**
  * Create a barebone websocket server and decorate it with the channels abstraction
+ * @param config TestConfig for this server
+ * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebSocket) => void = _ => { /* noop */ }): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
+function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
     const server = new WebSocket.Server({ port: config.port });
-    const wsChannels = new WebSocketChannels(server, serverSerdes);
+    const wsChannels = new WebSocketChannels(server, serverSerdes, heartbeatInterval);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
-        clientConnOverrides(ws);
     });
 
     server.on('error', err => {
@@ -82,6 +83,7 @@ function createWsChannels(config: TestConfig, clientConnOverrides: (client: WebS
 
 /**
  * Creates a barebone fastify server
+ * @param config TestConfig for this server
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
@@ -104,22 +106,21 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
 
 /**
  * Creates a fastify server in which graasp-websockets plugin was registered
+ * @param config TestConfig for this server
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: TestConfig, clientConnOverrides: (client: WebSocket, server: FastifyInstance) => void = _ => { /* noop */ }): Promise<FastifyInstance> {
+async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInstance> {
     return createFastifyInstance(config, async instance => {
+        // plugin must be registered inside this function parameter as it cannot be
+        // added after the instance has already booted
         await instance.register(graaspWebSockets, { prefix: config.prefix });
-
-        // plug in debug hooks
-        instance.websocketServer.addListener('connection', ws => {
-            clientConnOverrides(ws, instance);
-        });
     });
 }
 
 /**
  * Creates a connection URL for a WebSocket.Client given
  * a host, port and prefix config
+ * @param config TestConfig for this server
  */
 function createConnUrl(config: TestConfig): string {
     return `ws://${config.host}:${config.port}${config.prefix}`;
@@ -127,25 +128,24 @@ function createConnUrl(config: TestConfig): string {
 
 /**
  * Create a barebone websocket client
- * @param setupFn Setup function for the client. The done callback parameter MUST be called inside!
+ * @param config TestConfig for this server
  * @returns Promise of websocket client
  */
-async function createWsClient(config: TestConfig, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<WebSocket> {
+async function createWsClient(config: TestConfig): Promise<WebSocket> {
     return new Promise((resolve, reject) => {
         const client = new WebSocket(createConnUrl(config));
-        const done = () => resolve(client);
-        setupFn(client, done);
+        client.on("open", () => resolve(client));
     });
 }
 
 /**
  * Create N barebone websocket clients
+ * @param config TestConfig for this server
  * @param numberClients Number of websocket clients to spawn
- * @param setupFn Setup function passed to each of the N clients, the done callback parameter MUST be called inside!
  * @returns Promise of Array of N websocket clients
  */
-async function createWsClients(config: TestConfig, numberClients: number, setupFn: (ws: WebSocket, done: () => void) => void = (client, done) => client.on("open", () => done())): Promise<Array<WebSocket>> {
-    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config, setupFn));
+async function createWsClients(config: TestConfig, numberClients: number): Promise<Array<WebSocket>> {
+    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config));
     return Promise.all(clients);
 }
 
@@ -195,6 +195,7 @@ async function clientsWait(clients: Array<WebSocket>, numberMessages: number): P
 
 /**
  * Performs necessary conversion to send valid message from client
+ * @param client WebSocket client to send from
  * @param data ClientMessage to be sent
  */
 function clientSend(client: WebSocket, data: ClientMessage): void {
