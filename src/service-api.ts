@@ -105,6 +105,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                             createPayloadMessage({ status: "success", action: "unsubscribe", channel: request.channel }) :
                             createErrorMessage({ name: "Server error", message: "Unable to unsubscribe from channel " + request.channel });
                         wsChannels.clientSend(client, msg);
+                        // preemptively remove channel if empty
+                        wsChannels.channelDelete(request.channel, true);
                         break;
                     }
                 }

@@ -12,6 +12,7 @@ import { FastifyInstance } from 'fastify';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import { createPayloadMessage } from '../src/interfaces/message';
+import { serverMessageSchema } from '../src/schemas/message-schema';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
@@ -88,6 +89,30 @@ describe('Server internal behavior', () => {
             expect(channels.channels.size).toEqual(0);
         });
         wss.close();
+    });
+
+    test("Channel with removeIfEmpty is removed when its last subscriber unsubscribes from it", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const server = await createWsFastifyInstance(config);
+        server.websocketChannels.channelCreate('a', true);
+        const client = await createWsClient(config);
+
+        // subscribe to channel "a" and await ack
+        const ack = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const ackMsg = await ack;
+        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
+
+        // unsubscribe from channel "a" and await ack
+        const ack2 = clientWait(client, 1);
+        clientSend(client, { realm: "notif", action: "unsubscribe", channel: "a" });
+        const ack2Msg = await ack2;
+        expect(ack2Msg).toMatchObject({ body: { status: "success", action: "unsubscribe", channel: "a" } });
+        expect(server.websocketChannels.channels.get('a')).toBeUndefined();
+
+        client.close();
+        server.close();
     });
 
     test("Client that is removed is also deleted from channel subscribers", async () => {

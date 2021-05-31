@@ -239,10 +239,17 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
     /**
      * Delete a channel given its name
      * @param channelName name of the channel
+     * @param onlyIfEmpty remove the channel only if it has no subscribers anymore AND
+     *                    its removeIfEmpty flag is set to true
      */
-    channelDelete(channelName: string): boolean {
+    channelDelete(channelName: string, onlyIfEmpty: boolean = false): boolean {
         const channel = this.channels.get(channelName);
         if (channel !== undefined) {
+            // don't remove if onlyIfEmpty set but channel is not flagged, or it still has subscribers
+            if (onlyIfEmpty && (!channel.removeIfEmpty || channel.subscribers.size !== 0)) {
+                return false;
+            }
+
             channel.subscribers.forEach(sub => {
                 const client = this.subscriptions.get(sub);
                 if (client !== undefined) {
