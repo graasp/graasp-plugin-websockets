@@ -12,7 +12,6 @@ import { FastifyInstance } from 'fastify';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import { createPayloadMessage } from '../src/interfaces/message';
-import { serverMessageSchema } from '../src/schemas/message-schema';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
