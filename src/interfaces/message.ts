@@ -98,7 +98,7 @@ function createSharedItemNotif(userId: string, item: Item, action: "create" | "d
         channel: userId,
         type: "sharedItem",
         action: action,
-        body: (action === "delete") ? undefined : item,
+        body: item,
     };
 }
 
@@ -111,7 +111,7 @@ function createChildItemNotif(parentId: string, child: Item, action: "create" | 
         channel: parentId,
         type: "childItem",
         action: action,
-        body: (action === "delete") ? undefined : child,
+        body: child,
     };
 }
 
