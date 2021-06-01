@@ -12,9 +12,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
-import { Item } from 'graasp';
+import { Item, ItemMembership } from 'graasp';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { ClientMessage, createChildItemNotif, createErrorMessage, createPayloadMessage, ServerMessage } from './interfaces/message';
+import { ClientMessage, createChildItemNotif, createErrorMessage, createPayloadMessage, createSharedItemNotif, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
 import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
@@ -43,7 +43,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     // destructure passed fastify instance
     const prefix = options.prefix ? options.prefix : '/ws';
     const {
-        items: { taskManager },
+        items: { taskManager: itemTaskManager },
+        itemMemberships: { taskManager: itemMembershipTaskManager },
         taskRunner: runner,
     } = fastify;
 
@@ -159,7 +160,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     }
 
     // on create item, notify parent
-    const createItemTaskName = taskManager.getCreateTaskName();
+    const createItemTaskName = itemTaskManager.getCreateTaskName();
     runner.setTaskPostHookHandler<Item>(createItemTaskName, async (item) => {
         const parentId = getParentId(item);
         if (parentId !== undefined) {
@@ -168,12 +169,18 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     });
 
     // on delete item, notify parent
-    const deleteItemTaskName = taskManager.getDeleteTaskName();
+    const deleteItemTaskName = itemTaskManager.getDeleteTaskName();
     runner.setTaskPostHookHandler<Item>(deleteItemTaskName, async (item) => {
         const parentId = getParentId(item);
         if (parentId !== undefined) {
             channelsBroker.dispatch(parentId, createChildItemNotif(parentId, item, "delete"));
         }
+    });
+
+    // on item shared, notify members
+    const createItemMembershipTaskName = itemMembershipTaskManager.getCreateTaskName();
+    runner.setTaskPostHookHandler<ItemMembership>(createItemMembershipTaskName, async (membership) => {
+        channelsBroker.dispatch(membership.memberId, createSharedItemNotif(membership.memberId, "create"));
     });
 };
 

@@ -92,13 +92,12 @@ function createPayloadMessage(data: any): ServerMessage {
 /**
  * Factory to create a shared item notification
  */
-function createSharedItemNotif(userId: string, item: Item, action: "create" | "delete"): ServerMessage {
+function createSharedItemNotif(userId: string, action: "create" | "delete"): ServerMessage {
     return {
         realm: "notif",
         channel: userId,
         type: "sharedItem",
         action: action,
-        body: item,
     };
 }
 
