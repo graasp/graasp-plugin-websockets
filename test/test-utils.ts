@@ -92,11 +92,11 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify();
 
-        server.items = mockItemsManager;
+        server.decorate("items", mockItemsManager);
 
-        server.itemMemberships = mockItemMembershipsManager;
+        server.decorate("itemMemberships", mockItemMembershipsManager);
 
-        server.taskRunner = mockTaskRunner;
+        server.decorate("taskRunner", mockTaskRunner);
 
         setupFn(server);
 
