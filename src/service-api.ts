@@ -48,6 +48,10 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         taskRunner: runner,
     } = fastify;
 
+    console.log(itemTaskManager);
+    console.log(itemMembershipTaskManager);
+    console.log(runner);
+
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
         errorHandler: (error, conn, req, reply) => {
