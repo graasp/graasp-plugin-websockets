@@ -15,6 +15,7 @@ import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
+import { mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
 
 const clientSerdes: ClientMessageSerializer = new AjvClientMessageSerializer();
 const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
@@ -90,6 +91,12 @@ function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000)
 async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => void = _ => { /*noop*/ }): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify();
+
+        server.items = mockItemsManager;
+
+        server.itemMemberships = mockItemMembershipsManager;
+
+        server.taskRunner = mockTaskRunner;
 
         setupFn(server);
 
