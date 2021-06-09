@@ -140,3 +140,5 @@ export const mockTaskRunner: TaskRunner<Actor> = {
     unsetTaskPreHookHandler: (taskName, handler) => { },
     unsetTaskPostHookHandler: (taskName, handler) => { },
 };
+
+export const mockValidateSession = jest.fn((request, reply) => { });

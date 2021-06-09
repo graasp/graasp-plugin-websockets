@@ -15,7 +15,7 @@ import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
-import { mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
+import { mockItemMembershipsManager, mockItemsManager, mockTaskRunner, mockValidateSession } from './mocks';
 
 const clientSerdes: ClientMessageSerializer = new AjvClientMessageSerializer();
 const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
@@ -97,6 +97,8 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
         server.itemMemberships = mockItemMembershipsManager;
 
         server.taskRunner = mockTaskRunner;
+
+        server.validateSession = mockValidateSession;
 
         setupFn(server).then(() => {
             server.listen(config.port, config.host, (err, addr) => {

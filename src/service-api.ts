@@ -46,11 +46,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         items: { taskManager: itemTaskManager },
         itemMemberships: { taskManager: itemMembershipTaskManager },
         taskRunner: runner,
+        validateSession,
     } = fastify;
-
-    console.log(itemTaskManager);
-    console.log(itemMembershipTaskManager);
-    console.log(runner);
 
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
@@ -73,7 +70,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
     // user must have valid session
     // TODO: fix crash when user doesn't have valid session
-    fastify.addHook('preHandler', fastify.validateSession);
+    fastify.addHook('preHandler', validateSession);
 
     // cleanup on server close
     fastify.addHook("onClose", (instance, done) => {
