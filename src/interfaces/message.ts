@@ -8,6 +8,8 @@
  * @author Alexandre CHAU
  */
 
+import { Item } from "graasp";
+
 /**
  * Default message shape
  * Must have the "notif" type to allow future message types unrelated to notifications
@@ -61,6 +63,9 @@ interface Error {
  */
 interface ServerMessage extends Message {
     error?: Error
+    channel?: string
+    type?: "sharedItem" | "childItem"
+    action?: "create" | "delete"
     body?: any
 }
 
@@ -85,8 +90,33 @@ function createPayloadMessage(data: any): ServerMessage {
 }
 
 /**
+ * Factory to create a shared item notification
+ */
+function createSharedItemNotif(userId: string, action: "create" | "delete"): ServerMessage {
+    return {
+        realm: "notif",
+        channel: userId,
+        type: "sharedItem",
+        action: action,
+    };
+}
+
+/**
+ * Factory to create a child item notification
+ */
+function createChildItemNotif(parentId: string, child: Item, action: "create" | "delete"): ServerMessage {
+    return {
+        realm: "notif",
+        channel: parentId,
+        type: "childItem",
+        action: action,
+        body: child,
+    };
+}
+
+/**
  * Client message type is union type of all client message subtypes
  */
 type ClientMessage = ClientDisconnect | ClientSubscribe | ClientUnsubscribe | ClientSubscribeOnly;
 
-export { ClientMessage, ServerMessage, createErrorMessage, createPayloadMessage };
+export { ClientMessage, ServerMessage, createErrorMessage, createPayloadMessage, createSharedItemNotif, createChildItemNotif };

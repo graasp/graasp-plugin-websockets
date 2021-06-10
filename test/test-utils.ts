@@ -15,6 +15,7 @@ import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
+import { mockItemMembershipsManager, mockItemsManager, mockTaskRunner, mockValidateSession } from './mocks';
 
 const clientSerdes: ClientMessageSerializer = new AjvClientMessageSerializer();
 const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
@@ -87,17 +88,25 @@ function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000)
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
-async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => void = _ => { /*noop*/ }): Promise<FastifyInstance> {
+async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => new Promise((resolve, reject) => resolve())): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify();
 
-        setupFn(server);
+        server.items = mockItemsManager;
 
-        server.listen(config.port, config.host, (err, addr) => {
-            if (err) {
-                reject(err.message);
-            }
-            resolve(server);
+        server.itemMemberships = mockItemMembershipsManager;
+
+        server.taskRunner = mockTaskRunner;
+
+        server.validateSession = mockValidateSession;
+
+        setupFn(server).then(() => {
+            server.listen(config.port, config.host, (err, addr) => {
+                if (err) {
+                    reject(err.message);
+                }
+                resolve(server);
+            });
         });
     });
 

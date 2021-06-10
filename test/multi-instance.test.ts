@@ -39,7 +39,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
     // broker dispatch should be received by both clients
     const test1 = clientWait(client1, 1);
     const test2 = clientWait(client2, 1);
-    instance1.websocketChannelsBroker.dispatch(createPayloadMessage("hello"), "test");
+    instance1.websocketChannelsBroker.dispatch("test", createPayloadMessage("hello"));
     const values = await Promise.all([test1, test2]);
     values.forEach(value => {
         expect(value).toStrictEqual({ realm: "notif", body: "hello" });

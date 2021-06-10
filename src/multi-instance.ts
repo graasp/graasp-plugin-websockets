@@ -122,10 +122,10 @@ class MultiInstanceChannelsBroker {
 
     /**
      * Send notification across instances INCLUDING THE CREATOR INSTANCE ITSELF
-     * @param notif Message to be sent on a given WS channel
      * @param channel Name of the WS channel to send to, or "broadcast" if it should be sent to all clients across instances
+     * @param notif Message to be sent on a given WS channel
      */
-    dispatch(notif: ServerMessage, channel: string | "broadcast"): void {
+    dispatch(channel: string | "broadcast", notif: ServerMessage): void {
         const msg = createRedisMessage(notif, channel);
         const json = redisSerdes.serialize(msg);
         this.pub.publish(config.redis.notifChannel, json);

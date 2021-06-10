@@ -12,8 +12,9 @@
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
+import { Item, ItemMembership } from 'graasp';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { ClientMessage, createErrorMessage, createPayloadMessage, ServerMessage } from './interfaces/message';
+import { ClientMessage, createChildItemNotif, createErrorMessage, createPayloadMessage, createSharedItemNotif, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
 import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
@@ -39,7 +40,14 @@ interface GraaspWebsocketsPluginOptions {
 const serdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
 const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify, options) => {
+    // destructure passed fastify instance
     const prefix = options.prefix ? options.prefix : '/ws';
+    const {
+        items: { taskManager: itemTaskManager },
+        itemMemberships: { taskManager: itemMembershipTaskManager },
+        taskRunner: runner,
+        validateSession,
+    } = fastify;
 
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
@@ -59,6 +67,16 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
     // decorate main fastify instance with multi-instance websocket channels broker
     fastify.decorate('websocketChannelsBroker', channelsBroker);
+
+    // user must have valid session
+    // TODO: fix crash when user doesn't have valid session
+    fastify.addHook('preHandler', validateSession);
+
+    // cleanup on server close
+    fastify.addHook("onClose", (instance, done) => {
+        channelsBroker.close();
+        done();
+    });
 
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;
@@ -87,6 +105,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribe": {
+                        // TODO: proper validation of channel before creating it
+                        if (!wsChannels.channels.has(request.channel)) {
+                            wsChannels.channelCreate(request.channel, true);
+                        }
+
                         const msg = (wsChannels.clientSubscribe(client, request.channel)) ?
                             createPayloadMessage({ status: "success", action: "subscribe", channel: request.channel }) :
                             createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
@@ -94,6 +117,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribeOnly": {
+                        // TODO: proper validation of channel before creating it
+                        if (!wsChannels.channels.has(request.channel)) {
+                            wsChannels.channelCreate(request.channel, true);
+                        }
+
                         const msg = (wsChannels.clientSubscribeOnly(client, request.channel)) ?
                             createPayloadMessage({ status: "success", action: "subscribeOnly", channel: request.channel }) :
                             createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
@@ -119,10 +147,40 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         });
     });
 
-    // cleanup on server close
-    fastify.addHook("onClose", (instance, done) => {
-        channelsBroker.close();
-        done();
+    /**
+     * Register graasp behavior into websocket channels system
+     */
+
+    // helper function to find parent of item
+    // TODO: use proper abstraction to find parent
+    function getParentId(item: Item): string | undefined {
+        const { path } = item;
+        const tokens = path.split('.');
+        return (tokens.length >= 2) ? tokens[tokens.length - 2].replace(/_/g, '-') : undefined;
+    }
+
+    // on create item, notify parent
+    const createItemTaskName = itemTaskManager.getCreateTaskName();
+    runner.setTaskPostHookHandler<Item>(createItemTaskName, async (item) => {
+        const parentId = getParentId(item);
+        if (parentId !== undefined) {
+            channelsBroker.dispatch(parentId, createChildItemNotif(parentId, item, "create"));
+        }
+    });
+
+    // on delete item, notify parent
+    const deleteItemTaskName = itemTaskManager.getDeleteTaskName();
+    runner.setTaskPostHookHandler<Item>(deleteItemTaskName, async (item) => {
+        const parentId = getParentId(item);
+        if (parentId !== undefined) {
+            channelsBroker.dispatch(parentId, createChildItemNotif(parentId, item, "delete"));
+        }
+    });
+
+    // on item shared, notify members
+    const createItemMembershipTaskName = itemMembershipTaskManager.getCreateTaskName();
+    runner.setTaskPostHookHandler<ItemMembership>(createItemMembershipTaskName, async (membership) => {
+        channelsBroker.dispatch(membership.memberId, createSharedItemNotif(membership.memberId, "create"));
     });
 };
 
