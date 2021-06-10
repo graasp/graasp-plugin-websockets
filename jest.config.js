@@ -10,6 +10,7 @@ module.exports = {
     "graasp": "<rootDir>/node_modules/@types/graasp/index.d.ts"
   },
   transformIgnorePatterns: [
+    // by default node_modules are not transformed by jest: force typescript compilation for given types
     "node_modules/@types/(?!graasp)"
   ],
   globals: {

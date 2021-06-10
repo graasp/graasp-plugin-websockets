@@ -141,4 +141,6 @@ export const mockTaskRunner: TaskRunner<Actor> = {
     unsetTaskPostHookHandler: (taskName, handler) => { },
 };
 
-export const mockValidateSession = jest.fn((request, reply) => { });
+// Signature of @types/graasp/plugins/auth/interfaces/auth.d.ts is wrong! Force return of Promise
+// instead of void to ensure termination (https://www.fastify.io/docs/latest/Hooks/#prehandler).
+export const mockValidateSession = jest.fn((request, reply) => Promise.resolve());
