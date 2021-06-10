@@ -110,7 +110,6 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                             wsChannels.channelCreate(request.channel, true);
                         }
 
-                        wsChannels.clientSubscribe(client, request.channel);
                         const msg = (wsChannels.clientSubscribe(client, request.channel)) ?
                             createPayloadMessage({ status: "success", action: "subscribe", channel: request.channel }) :
                             createErrorMessage({ name: "Server error", message: "Unable to subscribe to channel " + request.channel });
