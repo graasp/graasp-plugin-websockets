@@ -2,7 +2,6 @@
   "exclude": [                                /* Excluded folders from compilation */
     "node_modules",
     "dist",
-    // "test",                                   /* Tests are ran with ts-jest, which processes TS files directly */
   ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
