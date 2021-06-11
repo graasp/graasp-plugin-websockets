@@ -1,4 +1,4 @@
 all: pandoc
 
 pandoc:
-	pandoc -V geometry:margin=2.5cm --variable urlcolor=cyan --number-sections -o graasp-websockets.pdf graasp-websockets.md
+	pandoc --citeproc --bibliography=biblio.bib --variable geometry:margin=2.5cm --variable urlcolor=cyan --number-sections -o graasp-websockets.pdf graasp-websockets.md
