@@ -31,9 +31,9 @@ header-includes:
 	{\Large Alexandre CHAU\par}
 	\vfill
 	supervised by\par
-	{\Large Dr. Denis \textsc{Gillet}\par}
-	{\Large Dr. Nicolas \textsc{Macris}\par}
-    {\Large André \textsc{Nogueira}\par}
+	{Dr. Denis \textsc{Gillet}\par}
+	{Dr. Nicolas \textsc{Macris}\par}
+    {André \textsc{Nogueira}\par}
 
 	\vfill
 	{\large \today\par}
@@ -128,21 +128,75 @@ The plugin is composed of several independent modules. They are reflected in the
 
 - **impls/message-serializer.ts**: the above equivalent definitions allow the AJV library to compile efficient parsers, validators and serializers for the corresponding object types, which are more performant than generic solutions such as `JSON.parse`.
 
+To demonstrate that modules are indeed independent, the repository provides an example of an application that only uses the WebSocket channels abstraction that showcases a real-time chat room (a feature currently unrelated to *Graasp*).
+
 ## Front-end: graasp-compose
 
-# Future work
+The *Graasp v3* rewrite also includes a rework of the front-end ecosystem. To demonstrate use cases of the `graasp-websockets` extension, we implement real-time interactions in `graasp-compose`, the new web application to manage learning content in *Graasp*. `graasp-compose` allows user to create content by uploading files, writing documents, linking external resources with URLs, integrating other *Graasp labs* and applications, ...
+
+`graasp-compose` is written in [ReactJS](https://reactjs.org/), a JavaScript library for building user interfaces following a reactive, declarative MVVM paradigm. It also uses [react-query](https://react-query.tanstack.com/), a state synchronization and caching library for React applications.
+
+We implement several server state changes that are pushed in real-time (without any page reload or user interaction) to client interfaces:
+
+-  when a user *shares* the ownership of an item with another user, the recipient sees the new item immediately in his/her "Shared with me" list
+
+- when an item is created in a *space*, other users that are currently browsing that *space* see the new item appear inside immediately
+
+- when an item is deleted in a *space*, other users  that are currently browsing that *space* see the old item disappear inside immediately
+
+![A screenshot of graasp-compose (in development)](img/graasp-compose-actions.png){#id .class width=300px}
+
+### Architecture
+
+The WebSocket extensions in the front-end are implemented in 3 parts:
+
+-  The *websocket notification API* (`src/api/notif.js`) implements a thin wrapper around the native WebSocket connection available in web browsers. It handles the protocol previously defined by the back-end service API and keeps stateful bindings between channel subscriptions and code handlers that will modify the UI in response to channel events.
+
+- The *custom hooks* define [React hooks](https://reactjs.org/docs/hooks-intro.html) as functions that perform side-effects: they are bound to the lifecycle of the UI components wherever they are called. They use the websocket notification API defined above to allow components to subscribe to updates of a specific channel,  and use the `react-query` query client to mutate the cached data previously received from the server. For instance `useSharedItemsUpdates` will subscribe to the channel of the items shared with the current user, and will force a cache flush of the locally stored shared items from the current session if new items are shared with him/her.
+
+- The above custom hooks are inserted into the *React UI components tree* so that displayed elements that should change with updates can re-render when new state is available. For instance, the `useSharedItemsUpdates` hook is called in `src/components/SharedItems.js` which describes the UI view of the list of shared items of the current user.
+
+![Block diagram of the WebSocket architecture in graasp-compose](img/graasp-websockets.frontend.png){#id .class width=475px}
+
+In the shared items example, the `SharedItems` view subscribes to the corresponding channel for the current user when the view is mounted into the webpage. When a new notification is sent from the server, the websocket notification API calls back the corresponding custom hook handler. This updates the cache of the shared items with new items from the server, which in turn triggers a re-render of the view through the React component lifecycle and which finally displays the updated list of shared items to the user. Similar implementations are written for the `ItemScreen` component which displays the children elements of a space.
+
+![Screenshot of a live demo of graasp-websockets: on the left, items are being deleted by the user "Alice". She receives visual feedback on the top-right corner that the items are successfully deleted on  the server as well. On the right, Bob also had the same elements removed, as evidenced by the same number of children items on the right.](img/graasp-compose-demo.png)
+
+# Limitations
+
+## Implementation issues
+
+## Trade-offs
+
+## Future work
 
 # Conclusion
 
+\newpage
+
 # References
 
-1. Denis Gillet, Andrii Vozniuk, Maria Jesus Rodriguez Triana, and Adrian Christian Holzer. 2016. *"Agile, Versatile, and Comprehensive Social Media Platform for Creating, Sharing, Exploiting, and Archiving Personal Learning Spaces, Artifacts, and Traces"*. [http://infoscience.epfl.ch/record/221529](http://infoscience.epfl.ch/record/221529)
+1. Denis Gillet, Andrii Vozniuk, Maria Jesus Rodriguez Triana, and Adrian Christian Holzer. 2016. *"Agile, Versatile, and Comprehensive Social Media Platform for Creating, Sharing, Exploiting, and Archiving Personal Learning Spaces, Artifacts, and Traces"*.  
+[http://infoscience.epfl.ch/record/221529](http://infoscience.epfl.ch/record/221529)
 
 2. Alexey Melnikov and Ian Fette. Melnikov, Alexey, and Ian Fette. 2011. 
-*“The WebSocket Protocol”*. Request for Comments. RFC 6455. [https://doi.org/10.17487/RFC6455](https://doi.org/10.17487/RFC6455)
+*“The WebSocket Protocol”*. Request for Comments. RFC 6455.  
+[https://doi.org/10.17487/RFC6455](https://doi.org/10.17487/RFC6455)
 
-3. *Socket.IO*. Accessed on 2021-06-11. [https://socket.io/](https://socket.io/)
+3. *Socket.IO*. Accessed on 2021-06-11.  
+[https://socket.io/](https://socket.io/)
 
-4. *Fastify*. Accessed on 2021-06-11. [https://www.fastify.io/](https://www.fastify.io/)
+4. *Fastify*. Accessed on 2021-06-11.  
+[https://www.fastify.io/](https://www.fastify.io/)
 
-5. *Redis Pub/Sub*. Accessed on 2021-06-11. [https://redis.io/topics/pubsub](https://redis.io/topics/pubsub)
+5. *Redis Pub/Sub*. Accessed on 2021-06-11.  
+[https://redis.io/topics/pubsub](https://redis.io/topics/pubsub)
+
+6. *AJV JSON Type Definition*. Accessed on 2021-06-11.  
+[https://ajv.js.org/json-type-definition.html](https://ajv.js.org/json-type-definition.html)
+
+7. *React Introducing Hooks*. Accessed on 2021-06-11.  
+[https://reactjs.org/docs/hooks-intro.html](https://reactjs.org/docs/hooks-intro.html)
+
+8. *React Query QueryClient*. Accessed on 2021-06-11.  
+[https://react-query.tanstack.com/reference/QueryClient](https://react-query.tanstack.com/reference/QueryClient)
