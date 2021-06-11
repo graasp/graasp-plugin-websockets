@@ -162,17 +162,41 @@ In the shared items example, the `SharedItems` view subscribes to the correspond
 
 ![Screenshot of a live demo of graasp-websockets: on the left, items are being deleted by the user "Alice". She receives visual feedback on the top-right corner that the items are successfully deleted on  the server as well. On the right, Bob also had the same elements removed, as evidenced by the same number of children items on the right.](img/graasp-compose-demo.png)
 
+# Testing
+
+The codebase is tested with a fairly extensive test suite of unit tests as well as end-to-end tests using the Jest framework. Code coverage of the tests is also tracked using the `istanbul` tool integrated in Jest. The code is built and tested using continuous integration (CI) on a fresh environment using Github Actions at every push to the repository. Code lint issues are checked as well, and mocks are implemented for injected services (such as database, task manager).
+
+![Example successful run of continuous integration testing on Github Actions](img/graasp-websockets.tests.png){#id .class width=400px}
+
 # Limitations
 
-## Implementation issues
+- As TypeScript is used to provide better context about the code to tools and programmers and AJV is used to perform validation and (de-)serialization of messages to program objects, every protocol-related type must be described twice: as a TypeScript structural definition, as well as a JSON Type Definition schema. There exist tools to convert from one to the other, however not all edge cases can be computed.
 
-## Trade-offs
+- TypeScript is not a silver bullet: dynamic decoration of objects at runtime (for instance using indexed accesses) prevents the compiler from distinguishing when such properties actually exist.
+
+- As in many stateful web services, the memory that a user can consume (by subscribing to channels) is generally not bounded. This means that a malicious client could craft a DoS in an attempt to exhaust server instances from available memory. This is mitigated by authenticating the user and performing garbage collection of unused resources periodically, however the time period is the limiting factor.
+
+- npm (the dependencies manager for the NodeJS environment) is unable to resolve private git dependencies correctly when using the `npm ci` command on Github Actions. This command should provide better guarantees about fresh testing environments, however the current CI script uses `npm install` instead which resolves these dependencies correctly.
+
+- ts-jest does not compile Typescript sources and type definition files from dependencies in the `node_modules` folder (i.e. it considers that all imports from this folder are ready-to-use Javascript files). Specific configuration for each such import must be specified in `jest.config.js` with the `moduleNameMapper` and `transformIgnorePatterns` entries, as well as a custom compiler configuration (`tsconfig.test.json`).
+
+- In the current implementation, each possible notification must be encoded as a message type, a corresponding back-end request handler entry, a binding to some action hook from the fastify instance properties, a front-end React hook that modifies some corresponding cache entry(-ies) and a call to that hook from some React component. Currently, a given channel can only bind to single React hook as well. The design could be improved with an additional layer of abstraction to generalize the API to more use cases.
+
+- Directly editing the React Query cache entries is potentially error-prone, especially if asynchronous updates are received out-of-order. Instead, the React hooks could simply invalidate the cache entries and trigger a complete refetch of the corresponding data through the HTTP REST API at every notification, however this would trade stronger consistency against additional network usage (as all data would be refetched at every update, instead of incremental patches).
 
 ## Future work
 
+- More interactions and notification types will be added from user scenarios in front-end graasp application such as `graasp-compose`
+
+- The front-end library will be consolidated to support multiple hook handlers per channel
+
+- Additional checks can be added against potentially malicious requests (for instance, the server instance could check against the database whether the client is allowed to subscribe to any specific channel before creating it if required).
+
 # Conclusion
 
-\newpage
+In this project, we implement a WebSocket-based content distribution system for real-time updates targeting specific groups of clients. It abstracts global and channel broadcast operations across a network of computers (composed of any positive number of clients and servers) using only point-to-point WebSocket connections between each client and server pair. It defines a custom domain-specific protocol for messages exchanged over WebSocket.
+
+`graasp-websockets` is designed as a Fastify plugin that can be plugged into the  core server instance, with reusable modules. It provides support for dynamically allocated channels, garbage collection, and multiple server instances by relaying notifications through Redis. It also features front-end integration examples for React-based applications.
 
 # References
 
