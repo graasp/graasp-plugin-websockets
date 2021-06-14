@@ -12,7 +12,7 @@ This plugin requires a [Redis](https://redis.io/) instance which serves as a rel
 
 Add this plugin repository to the dependencies section of the `package.json` of your Graasp server instance:
 
-```json
+```jsonc
   "dependencies": {
       // Graasp's other dependencies...
       "graasp-websockets": "git://github.com/graasp/graasp-websockets.git#master",
