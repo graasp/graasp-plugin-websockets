@@ -53,7 +53,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     await fastify.register(fws, {
         errorHandler: (error, conn, req, reply) => {
             console.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection ${conn}...`);
-            conn.destroy(error);
+            conn.destroy();
         }
     });
 
