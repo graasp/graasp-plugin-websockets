@@ -41,6 +41,10 @@ instance
 
 Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (e.g. `items`, `itemMemberships`, `taskRunner`, `validateSession`, ...)!
 
+## API
+
+This plugin implements a custom protocol over WebSoket between clients and this server plugin to send real-time notifications for specific Graasp behaviours. Please read [`API.md`](API.md) for more information about the messages format used between the server and clients that subscribe to updates from `graasp-websockets`.
+
 ## Building locally
 
 If you'd like to run the code for other purposes (such as reusing modules without Graasp or just trying things out locally), clone this repository with:
