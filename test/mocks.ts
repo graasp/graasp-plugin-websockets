@@ -6,7 +6,7 @@
  * @author Alexandre CHAU
  */
 
-import { Actor, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, Task, TaskRunner } from 'graasp';
+import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, MemberType, PermissionLevel, Task, TaskRunner } from 'graasp';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
@@ -139,6 +139,25 @@ export const mockTaskRunner: TaskRunner<Actor> = {
     setTaskPostHookHandler: (taskName, handler) => { },
     unsetTaskPreHookHandler: (taskName, handler) => { },
     unsetTaskPostHookHandler: (taskName, handler) => { },
+};
+
+export const mockDatabase: Database = {
+    pool: {}
+};
+
+const createMockMember = (extra?) => ({
+    name: "mock",
+    email: "mock",
+    id: "mock",
+    type: "individual",
+    extra,
+    createdAt: "mock",
+    updatedAt: "mock",
+});
+
+// mock preHandler to be injected in test fastify instance to simulate authentication
+export const mockSessionPreHandler = async (request, reply) => { 
+    request.member = createMockMember();
 };
 
 // Signature of @types/graasp/plugins/auth/interfaces/auth.d.ts is wrong! Force return of Promise

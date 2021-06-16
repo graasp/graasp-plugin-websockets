@@ -8,16 +8,14 @@
 
 import fastify, { FastifyInstance } from 'fastify';
 import WebSocket from 'ws';
-import { AjvClientMessageSerializer } from '../client/impls/ajv-client-message-serializer';
-import { ClientMessageSerializer } from '../client/interfaces/client-message-serializer';
 import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
-import { mockItemMembershipsManager, mockItemsManager, mockTaskRunner, mockValidateSession } from './mocks';
+import { mockDatabase, mockItemMembershipsManager, mockItemsManager, mockSessionPreHandler, mockTaskRunner, mockValidateSession } from './mocks';
 
-const clientSerdes: ClientMessageSerializer = new AjvClientMessageSerializer();
+const clientSerdes = { serialize: JSON.stringify, parse: JSON.parse };
 const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
 /**
@@ -66,7 +64,7 @@ class PortGenerator {
  */
 function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
     const server = new WebSocket.Server({ port: config.port });
-    const wsChannels = new WebSocketChannels(server, serverSerdes, heartbeatInterval);
+    const wsChannels = new WebSocketChannels(server, serverSerdes, console, heartbeatInterval);
 
     server.on('connection', ws => {
         wsChannels.clientRegister(ws);
@@ -90,7 +88,7 @@ function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000)
  */
 async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => new Promise((resolve, reject) => resolve())): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
-        const server = fastify();
+        const server = fastify(/*{ logger: true }*/);
 
         server.items = mockItemsManager;
 
@@ -99,6 +97,9 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
         server.taskRunner = mockTaskRunner;
 
         server.validateSession = mockValidateSession;
+        server.addHook("preHandler", mockSessionPreHandler);
+
+        server.db = mockDatabase;
 
         setupFn(server).then(() => {
             server.listen(config.port, config.host, (err, addr) => {
@@ -172,6 +173,10 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<Se
 
         if (numberMessages === 1) {
             client.on('message', (data) => {
+                if (typeof data !== "string") {
+                    reject(new Error(`Parsing error: server message could not be converted: ${data}`));
+                    return;
+                }
                 const msg = clientSerdes.parse(data);
                 if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
                 else resolve(msg);
@@ -179,6 +184,10 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<Se
         } else {
             const buffer: Array<ServerMessage> = [];
             client.on('message', (data) => {
+                if (typeof data !== "string") {
+                    reject(new Error(`Parsing error: server message could not be converted: ${data}`));
+                    return;
+                }
                 const msg = clientSerdes.parse(data);
                 if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
                 else buffer.push(msg);

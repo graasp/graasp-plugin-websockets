@@ -11,7 +11,7 @@
 import { FastifyInstance } from 'fastify';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
-import { createPayloadMessage } from '../src/interfaces/message';
+import { ClientMessage, createServerInfo } from '../src/interfaces/message';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
@@ -98,16 +98,28 @@ describe('Server internal behavior', () => {
 
         // subscribe to channel "a" and await ack
         const ack = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const request: ClientMessage = { realm: "notif", action: "subscribe", channel: "a", entity: "item" };
+        clientSend(client, request);
         const ackMsg = await ack;
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request,
+        });
         expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
 
         // unsubscribe from channel "a" and await ack
         const ack2 = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "unsubscribe", channel: "a" });
+        const request2: ClientMessage = { realm: "notif", action: "unsubscribe", channel: "a" };
+        clientSend(client, request2);
         const ack2Msg = await ack2;
-        expect(ack2Msg).toMatchObject({ body: { status: "success", action: "unsubscribe", channel: "a" } });
+        expect(ack2Msg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: request2,
+        });
         expect(server.websocketChannels.channels.get('a')).toBeUndefined();
 
         client.close();
@@ -122,9 +134,15 @@ describe('Server internal behavior', () => {
 
         // subscribe to channel "a" and await ack
         const ack = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "a", entity: "item" }
+        clientSend(client, req);
         const ackMsg = await ack;
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
         expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
 
         client.close();
@@ -143,9 +161,15 @@ describe('Server internal behavior', () => {
 
         // subscribe to channel "a" and await ack
         const ack = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "subscribe", channel: "a" });
+        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "a", entity: "item" };
+        clientSend(client, req);
         const ackMsg = await ack;
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "a" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
         expect(server.websocketChannels.channels.get('a')?.subscribers.size).toEqual(1);
 
         server.websocketChannels.subscriptions.forEach(client => {
@@ -183,8 +207,10 @@ describe('Client requests are handled', () => {
         const data = await response;
         expect(data).toStrictEqual({
             realm: "notif",
+            status: "error",
+            type: "response",
             error: {
-                "name": "Invalid request message",
+                "name": "INVALID_REQUEST",
                 "message": "Request message format was not understood by the server",
             },
         });
@@ -202,24 +228,35 @@ describe('Client requests are handled', () => {
         // subscribe only 4 times in a row to 4 channels
         const client = await createWsClient(config);
         const acks = clientWait(client, 4);
-        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "1" });
-        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "2" });
-        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "3" });
-        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "4" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "1", entity: "item" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "2", entity: "item" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "3", entity: "item" });
+        clientSend(client, { realm: "notif", action: "subscribeOnly", channel: "4", entity: "item" });
         const ackMsgs = await acks;
-        const expectedAckMsgs = ["1", "2", "3", "4"].map(c => ({ body: { status: "success", action: "subscribeOnly", channel: c } }));
-        expect(ackMsgs).toMatchObject(expectedAckMsgs);
+        const expectedAckMsgs = ["1", "2", "3", "4"].map(c => ({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: {
+                realm: "notif",
+                action: "subscribeOnly",
+                channel: c,
+                entity: "item"
+            },
+        }));
+        expect(ackMsgs).toStrictEqual(expectedAckMsgs);
 
         // wait for a single message: should only received from channel "4"
         const waitMsg = clientWait(client, 1);
-        server.websocketChannels.channelSend("1", createPayloadMessage("hello1"));
-        server.websocketChannels.channelSend("2", createPayloadMessage("hello2"));
-        server.websocketChannels.channelSend("3", createPayloadMessage("hello3"));
-        server.websocketChannels.channelSend("4", createPayloadMessage("hello4"));
+        server.websocketChannels.channelSend("1", createServerInfo("hello1"));
+        server.websocketChannels.channelSend("2", createServerInfo("hello2"));
+        server.websocketChannels.channelSend("3", createServerInfo("hello3"));
+        server.websocketChannels.channelSend("4", createServerInfo("hello4"));
         const data = await waitMsg;
         expect(data).toStrictEqual({
             realm: "notif",
-            body: "hello4",
+            type: "info",
+            message: "hello4",
         });
 
         client.close();
@@ -233,34 +270,53 @@ describe('Client requests are handled', () => {
         const client = await createWsClient(config);
 
         let ack, ackMsg;
+        let req: ClientMessage;
 
         // subscribe client to channel
+        req = { realm: "notif", action: "subscribe", channel: "1", entity: "item" };
         ack = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+        clientSend(client, req);
         ackMsg = await ack;
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "1" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
 
         // unsubscribe client from channel
         ack = clientWait(client, 1);
-        clientSend(client, { realm: "notif", action: "unsubscribe", channel: "1" });
+        req = { realm: "notif", action: "unsubscribe", channel: "1" };
+        clientSend(client, req);
         ackMsg = await ack;
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "unsubscribe", channel: "1" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
 
         // expect next message to be ack for subscribing again, but NOT "you should not receive me"
         ack = clientWait(client, 1);
-        server.websocketChannels.channelSend("1", createPayloadMessage("you should not receive me"));
+        server.websocketChannels.channelSend("1", createServerInfo("you should not receive me"));
 
         // subscribe again client to channel
-        clientSend(client, { realm: "notif", action: "subscribe", channel: "1" });
+        req = { realm: "notif", action: "subscribe", channel: "1", entity: "item" };
+        clientSend(client, req);
         ackMsg = await ack;
         expect(ackMsg).not.toMatchObject({
-            body: "you should not receive me",
+            message: "you should not receive me",
         });
-        expect(ackMsg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "1" } });
+        expect(ackMsg).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
 
         // now next message should be "hello again"
         const waitMsg = clientWait(client, 1);
-        server.websocketChannels.channelSend("1", createPayloadMessage("hello again"));
+        server.websocketChannels.channelSend("1", createServerInfo("hello again"));
         const data = await waitMsg;
 
         expect(data).not.toMatchObject({
@@ -269,7 +325,8 @@ describe('Client requests are handled', () => {
 
         expect(data).toStrictEqual({
             realm: "notif",
-            body: "hello again",
+            type: "info",
+            message: "hello again",
         });
 
         client.close();
@@ -307,13 +364,13 @@ describe('Channel messages sent by server are received by clients', () => {
         // spawn 5 clients and sub them to channel 1
         testEnv.subs1 = await createWsClients(config, numClients);
         ack = clientsWait(testEnv.subs1, 1);
-        testEnv.subs1.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "1" }));
+        testEnv.subs1.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "1", entity: "item" }));
         await ack;
 
         // spawn 5 clients and sub them to channel 2
         testEnv.subs2 = await createWsClients(config, numClients);
         ack = clientsWait(testEnv.subs2, 1);
-        testEnv.subs2.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "2" }));
+        testEnv.subs2.forEach(client => clientSend(client, { realm: "notif", action: "subscribe", channel: "2", entity: "item" }));
         await ack;
 
         // spawn 5 clients and don't sub them
@@ -321,24 +378,28 @@ describe('Channel messages sent by server are received by clients', () => {
     });
 
     test("Clients subscribed to channel '1' all receive 'msg1'", async () => {
-        const msg = createPayloadMessage('msg1');
+        const msg = createServerInfo('msg1');
         const test = clientsWait(testEnv.subs1!, 1);
+        delete msg.extra;
         testEnv.server!.websocketChannels.channelSend('1', msg);
         const data = await test;
         data.forEach(value => expect(value).toStrictEqual(msg));
     });
 
     test("Clients subscribed to channel '2' all receive 'msg2", async () => {
-        const msg = createPayloadMessage('msg2');
+        const msg = createServerInfo('msg2');
         const test = clientsWait(testEnv.subs2!, 1);
+        delete msg.extra;
         testEnv.server!.websocketChannels.channelSend('2', msg);
         const data = await test;
         data.forEach(value => expect(value).toStrictEqual(msg));
     });
 
     test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", async () => {
-        const hello2 = createPayloadMessage('hello2');
-        const hello1 = createPayloadMessage('hello1');
+        const hello2 = createServerInfo('hello2');
+        delete hello2.extra;
+        const hello1 = createServerInfo('hello1');
+        delete hello1.extra;
         const test1 = clientsWait(testEnv.subs1!, 1);
         const test2 = clientsWait(testEnv.subs2!, 1);
         testEnv.server!.websocketChannels.channelSend('1', hello1);
@@ -350,7 +411,8 @@ describe('Channel messages sent by server are received by clients', () => {
     });
 
     test("All clients receive broadcasts even if not subscribed to channels", async () => {
-        const broadcastMsg = createPayloadMessage({ hello: "world" });
+        const broadcastMsg = createServerInfo("hello world");
+        delete broadcastMsg.extra;
         const clientsShouldReceive = new Array<WebSocket>().concat(testEnv.subs1!, testEnv.subs2!, testEnv.unsubs!);
         const test = clientsWait(clientsShouldReceive, 1);
         testEnv.server!.websocketChannels.broadcast(broadcastMsg);

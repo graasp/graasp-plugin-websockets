@@ -105,7 +105,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
             // find clients that are not registered anymore
             this.wsServer.clients.forEach(ws => {
                 if (this.subscriptions.get(ws) === undefined) {
-                    log.log(`graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`);
+                    log.info(`graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`);
                     ws.terminate();
                 }
             });
@@ -115,7 +115,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
                 if (client.isAlive === false) {
                     // remove from this instance also
                     this.clientRemove(ws);
-                    log.log(`graasp-websockets: ejecting client ${ws.url}, timeout detected`);
+                    log.info(`graasp-websockets: ejecting client ${ws.url}, timeout detected`);
                     return ws.terminate();
                 }
 
@@ -128,7 +128,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
             this.channels.forEach((channel, name) => {
                 if (channel.removeIfEmpty && channel.subscribers.size === 0) {
                     this.channelDelete(name);
-                    log.log(`graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`);
+                    log.info(`graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`);
                 }
             });
         }, heartbeatInterval);

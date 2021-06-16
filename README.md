@@ -152,7 +152,6 @@ If your project depends on `graasp-websockets`, cannot fetch the `graasp-websock
 ## Repository structure
 
 - [`.github/`](.github/): Github-related configurations, such as Actions
-- [`client/`](client/): client-side interfaces and implementations
 - [`examples/`](examples/): example usages of the modules in `graasp-websockets`
 - [`report/`](report/): technical project report, read this if you want a more in-depth look at the project architecture
 - [`src/`](src/): source code of the `graasp-websockets` plugin and its modules

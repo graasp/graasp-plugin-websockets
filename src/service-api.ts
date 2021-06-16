@@ -107,6 +107,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                     return accessDeniedError(request.channel);
                 }
             } catch (error) {
+                log.error(`graasp-websockets: Unexpected server error: ${error}`);
                 // database error
                 return { name: "SERVER_ERROR", message: "Database error" };
             }

@@ -6,7 +6,7 @@
  * @author Alexandre CHAU
  */
 
-import { createPayloadMessage } from "../src/interfaces/message";
+import { ClientMessage } from "../src/interfaces/message";
 import { clientSend, clientWait, createDefaultLocalConfig, createWsClient, createWsFastifyInstance, PortGenerator } from "./test-utils";
 
 const portGen = new PortGenerator(5000);
@@ -29,20 +29,27 @@ test('Message sent on a multi-instance broker is received by all instances', asy
     // subscribe each client to a respective broker instance on channel "test"
     const ack1 = clientWait(client1, 1);
     const ack2 = clientWait(client2, 1);
-    clientSend(client1, { realm: "notif", action: "subscribe", channel: "test" });
-    clientSend(client2, { realm: "notif", action: "subscribe", channel: "test" });
+    const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "test", entity: "item" };
+    clientSend(client1, req);
+    clientSend(client2, req);
     const ack1Msg = await ack1;
     const ack2Msg = await ack2;
-    expect(ack1Msg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "test" } });
-    expect(ack2Msg).toMatchObject({ body: { status: "success", action: "subscribe", channel: "test" } });
+    const expected = {
+        realm: "notif",
+        type: "response",
+        status: "success",
+        request: req,
+    };
+    expect(ack1Msg).toStrictEqual(expected);
+    expect(ack2Msg).toStrictEqual(expected);
 
     // broker dispatch should be received by both clients
     const test1 = clientWait(client1, 1);
     const test2 = clientWait(client2, 1);
-    instance1.websocketChannelsBroker.dispatch("test", createPayloadMessage("hello"));
+    instance1.websocketChannelsBroker.dispatch("test", { realm: "notif", type: "info", message: "hello" });
     const values = await Promise.all([test1, test2]);
     values.forEach(value => {
-        expect(value).toStrictEqual({ realm: "notif", body: "hello" });
+        expect(value).toStrictEqual({ realm: "notif", type: "info", message: "hello" });
     });
 
     client1.close();

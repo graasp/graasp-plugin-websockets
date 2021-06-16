@@ -74,7 +74,7 @@ function createRedisClientInstance(redisConfig?: Redis.RedisOptions, log: Logger
     });
 
     redis.on("error", (err) => {
-        log.log(`graasp-websockets: MultiInstanceChannelsBroker failed to connect to Redis instance, reason:\n\t${err}`);
+        log.error(`graasp-websockets: MultiInstanceChannelsBroker failed to connect to Redis instance, reason:\n\t${err}`);
     });
 
     return redis;
@@ -99,8 +99,8 @@ class MultiInstanceChannelsBroker {
 
         this.sub.subscribe(config.redis.notifChannel, (err, count) => {
             if (err) {
-                log.log(`graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${config.redis.notifChannel}, reason: ${err.message}`);
-                log.log(`\t${err}`);
+                log.error(`graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${config.redis.notifChannel}, reason: ${err.message}`);
+                log.error(`\t${err}`);
             }
         });
 
@@ -108,7 +108,7 @@ class MultiInstanceChannelsBroker {
             if (channel === config.redis.notifChannel) {
                 const msg = redisSerdes.parse(message);
                 if (msg === undefined) {
-                    log.log(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${config.redis.notifChannel}": ${message}`);
+                    log.info(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${config.redis.notifChannel}": ${message}`);
                 } else {
                     // forward notification to respective channel
                     if (msg.channel === "broadcast") {
