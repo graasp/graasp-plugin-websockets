@@ -31,6 +31,7 @@ interface ClientDisconnect extends Message {
 interface ClientSubscribe extends Message {
     action: "subscribe",
     channel: string,
+    entity: "item" | "member",
 }
 
 /**
@@ -48,13 +49,14 @@ interface ClientUnsubscribe extends Message {
 interface ClientSubscribeOnly extends Message {
     action: "subscribeOnly",
     channel: string,
+    entity: "item" | "member",
 }
 
 /**
  * Restricted error to be sent to clients
  */
 interface Error {
-    name: "ACCESS_DENIED" | "INVALID_REQUEST" | "NOT_FOUND",
+    name: "ACCESS_DENIED" | "INVALID_REQUEST" | "NOT_FOUND" | "SERVER_ERROR",
     message: string,
 }
 
@@ -170,6 +172,7 @@ const createSharedWithUpdate = (memberId: string, operation: MemberSharedWithUpd
 export {
     ClientMessage,
     ServerMessage,
+    Error,
     createServerInfo,
     createServerErrorResponse,
     createServerSuccessResponse,

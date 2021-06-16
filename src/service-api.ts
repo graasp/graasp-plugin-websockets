@@ -14,7 +14,7 @@ import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { Item, ItemMembership } from 'graasp';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
-import { ClientMessage, createChildItemUpdate, createServerErrorResponse, createServerSuccessResponse, createSharedWithUpdate, ServerMessage } from './interfaces/message';
+import { ClientMessage, createChildItemUpdate, createServerErrorResponse, createServerSuccessResponse, createSharedWithUpdate, Error, ServerMessage } from './interfaces/message';
 import { MessageSerializer } from './interfaces/message-serializer';
 import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
@@ -39,17 +39,23 @@ interface GraaspWebsocketsPluginOptions {
 // Serializer / Deserializer instance
 const serdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
 
-// Helper to format NOT_FOUND error message
-const notFoundErrorMessage = (channel) => `Unable to subscribe to channel ${channel}: user or channel not found`;
+// Helpers to format errors
+const subscribeErrorMessage = (errorName, channel, reason) => ({
+    name: errorName,
+    message: `Unable to subscribe to channel ${channel}: ${reason}`,
+});
+const notFoundError = (channel) => subscribeErrorMessage("NOT_FOUND", channel, "user or channel not found");
+const accessDeniedError = (channel) => subscribeErrorMessage("ACCESS_DENIED", channel, "user access denied for this channel");
 
 const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify, options) => {
     // destructure passed fastify instance
     const prefix = options.prefix ? options.prefix : '/ws';
     const {
-        items: { taskManager: itemTaskManager },
-        itemMemberships: { taskManager: itemMembershipTaskManager },
+        items: { taskManager: itemTaskManager, dbService: itemDbService },
+        itemMemberships: { taskManager: itemMembershipTaskManager, dbService: itemMembershipDbService },
         taskRunner: runner,
         validateSession,
+        db,
         log,
     } = fastify;
 
@@ -81,8 +87,36 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         done();
     });
 
+    // helper to check if a user is allowed to subscribe to a channel
+    async function userCanUseChannel(request, member): Promise<"ok" | Error> {
+        // if channel entity is member and it is not the current user, deny access
+        if (request.entity === "member" && member.id !== request.channel) {
+            return accessDeniedError(request.channel);
+        }
+        // if channel entity is item and user does not have permission, deny access
+        else if (request.entity === "item") {
+            try {
+                const item = await itemDbService.get(request.channel, db.pool);
+                if (item === null) {
+                    // item was not found
+                    return notFoundError(request.channel);
+                }
+                const allowed = await itemMembershipDbService.canRead(member.id, item, db.pool);
+                if (!allowed) {
+                    // user does not have permission
+                    return accessDeniedError(request.channel);
+                }
+            } catch (error) {
+                // database error
+                return { name: "SERVER_ERROR", message: "Database error" };
+            }
+        }
+        return "ok";
+    }
+
     fastify.get(prefix, { websocket: true }, (connection, req) => {
         const client = connection.socket;
+        const { member } = req;
 
         // register client into channels system
         wsChannels.clientRegister(client);
@@ -91,7 +125,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
          * Handle incoming requests
          * Validate and dispatch received requests from client
          */
-        client.on('message', (message) => {
+        client.on('message', async (message) => {
             const request = serdes.parse(message);
             if (request === undefined) {
                 // validation error, send feedback
@@ -108,33 +142,45 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                         break;
                     }
                     case "subscribe": {
-                        // TODO: proper validation of channel before creating it
+                        const canUseOrError = await userCanUseChannel(request, member);
+                        if (canUseOrError !== "ok") {
+                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError));
+                            return;
+                        }
+
+                        // user is allowed, create channel if needed
                         if (!wsChannels.channels.has(request.channel)) {
                             wsChannels.channelCreate(request.channel, true);
                         }
 
                         const msg = (wsChannels.clientSubscribe(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse({ name: "NOT_FOUND", message: notFoundErrorMessage(request.channel) });
+                            createServerErrorResponse(notFoundError(request.channel));
                         wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "subscribeOnly": {
-                        // TODO: proper validation of channel before creating it
+                        const canUseOrError = await userCanUseChannel(request, member);
+                        if (canUseOrError !== "ok") {
+                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError));
+                            return;
+                        }
+
+                        // user is allowed, create channel if needed
                         if (!wsChannels.channels.has(request.channel)) {
                             wsChannels.channelCreate(request.channel, true);
                         }
 
                         const msg = (wsChannels.clientSubscribeOnly(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse({ name: "NOT_FOUND", message: notFoundErrorMessage(request.channel) });
+                            createServerErrorResponse(notFoundError(request.channel));
                         wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "unsubscribe": {
                         const msg = (wsChannels.clientUnsubscribe(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse({ name: "NOT_FOUND", message: notFoundErrorMessage(request.channel) });
+                            createServerErrorResponse(notFoundError(request.channel));
                         wsChannels.clientSend(client, msg);
                         // preemptively remove channel if empty
                         wsChannels.channelDelete(request.channel, true);
@@ -162,9 +208,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         return (tokens.length >= 2) ? tokens[tokens.length - 2].replace(/_/g, '-') : undefined;
     }
 
+    // helper function to extract child ID from item path
+    // TODO: use proper abstraction to extract child ID
     function extractChildId(itemPath: string): string {
         const tokens = itemPath.split('.');
-        return tokens[tokens.length - 1];
+        return tokens[tokens.length - 1].replace(/_/g, '-');
     }
 
     // on create item, notify parent
@@ -188,7 +236,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     // on item shared, notify members
     const createItemMembershipTaskName = itemMembershipTaskManager.getCreateTaskName();
     runner.setTaskPostHookHandler<ItemMembership>(createItemMembershipTaskName, async (membership) => {
-        const item = await ; // TODO: get item
+        const item = await itemDbService.get(extractChildId(membership.itemPath), db.pool);
         channelsBroker.dispatch(membership.memberId, createSharedWithUpdate(membership.memberId, "create", item));
     });
 };

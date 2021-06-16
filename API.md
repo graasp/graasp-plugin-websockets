@@ -25,10 +25,11 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
     {
         "realm": "notif",
         "action": "subscribe",
-        "channel": "<channelName>"
+        "channel": "<channelName>",
+        "entity": "<entityType>",
     }
     ```
-    where `<channelName>` is the name of the channel to subscribe to.
+    where `<channelName>` is the name of the channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item` or `member`).
 
 - Client unsubscribe: unsubscribe the WS client from the specified channel:
     ```jsonc
@@ -45,10 +46,11 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
     {
         "realm": "notif",
         "action": "subscribeOnly",
-        "channel": "<channelName>"
+        "channel": "<channelName>",
+        "entity": "<entityType>",
     }
     ```
-    where `<channelName>` is the name of the only channel to subscribe to.
+    where `<channelName>` is the name of the only channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item` or `member`).
 
 - Client disconnect: unsubscribes the WS client from all channels it is currently subscribed to and unregisters the WS client from `graasp-websockets`:
     ```jsonc
@@ -83,6 +85,7 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
     - `ACCESS_DENIED`: the client is not allowed to access the requested resource
     - `INVALID_REQUEST`: the client sent a request which format was not understood by the server
     - `NOT_FOUND`: the client or the requested resource was not found on the server
+    - `SERVER_ERROR`: unexpected server error while processing the request
 
 - Real-time updates: notifications sent to the client from a given channel which it is subscribed to.
     ```jsonc
