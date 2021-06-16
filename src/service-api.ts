@@ -73,7 +73,6 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     fastify.decorate('websocketChannelsBroker', channelsBroker);
 
     // user must have valid session
-    // TODO: fix crash when user doesn't have valid session
     fastify.addHook('preHandler', validateSession);
 
     // cleanup on server close
