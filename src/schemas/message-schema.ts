@@ -21,27 +21,27 @@ const clientMessageSchema: JTDSchemaType<ClientMessage> = {
         "disconnect": {
             properties: {
                 realm: { enum: ["notif"] },
-            }
+            },
         },
         "subscribe": {
             properties: {
                 realm: { enum: ["notif"] },
-                channel: { type: "string" }
-            }
+                channel: { type: "string" },
+            },
         },
         "unsubscribe": {
             properties: {
                 realm: { enum: ["notif"] },
-                channel: { type: "string" }
-            }
+                channel: { type: "string" },
+            },
         },
         "subscribeOnly": {
             properties: {
                 realm: { enum: ["notif"] },
-                channel: { type: "string" }
-            }
-        }
-    }
+                channel: { type: "string" },
+            },
+        },
+    },
 };
 
 
@@ -50,20 +50,88 @@ const clientMessageSchema: JTDSchemaType<ClientMessage> = {
  * MUST conform to {@link ServerMessage} (provide equivalent runtime types)
  */
 const serverMessageSchema: JTDSchemaType<ServerMessage> = {
-    properties: {
-        realm: { enum: ["notif"] }
-    },
-    optionalProperties: {
-        error: {
+    discriminator: "type",
+    mapping: {
+        "response": {
             properties: {
-                name: { type: "string" },
-                message: { type: "string" },
+                realm: { enum: ["notif"] },
+                status: { enum: ["success", "error"] },
+            },
+            optionalProperties: {
+                error: {
+                    properties: {
+                        name: { enum: ["ACCESS_DENIED", "INVALID_REQUEST", "NOT_FOUND"] },
+                        message: { type: "string" },
+                    },
+                },
+                request: {
+                    discriminator: "action",
+                    mapping: {
+                        "disconnect": {
+                            properties: {
+                                realm: { enum: ["notif"] },
+                            },
+                        },
+                        "subscribe": {
+                            properties: {
+                                realm: { enum: ["notif"] },
+                                channel: { type: "string" },
+                            },
+                        },
+                        "unsubscribe": {
+                            properties: {
+                                realm: { enum: ["notif"] },
+                                channel: { type: "string" },
+                            },
+                        },
+                        "subscribeOnly": {
+                            properties: {
+                                realm: { enum: ["notif"] },
+                                channel: { type: "string" },
+                            },
+                        },
+                    },
+                },
             },
         },
-        body: {},
-        channel: { type: "string" },
-        type: { enum: ["sharedItem", "childItem"] },
-        action: { enum: ["create", "delete"] }
+        "info": {
+            properties: {
+                realm: { enum: ["notif"] },
+                message: { type: "string" },
+            },
+            optionalProperties: {
+                extra: {},
+            },
+        },
+        "update": {
+            properties: {
+                realm: { enum: ["notif"] },
+                channel: { type: "string" },
+                body: {
+                    discriminator: "entity",
+                    mapping: {
+                        "item": {
+                            properties: {
+                                kind: { enum: ["childItem"] },
+                                operation: { enum: ["create", "delete"] },
+                            },
+                            optionalProperties: {
+                                value: {},
+                            }
+                        },
+                        "member": {
+                            properties: {
+                                kind: { enum: ["sharedWith"] },
+                                operation: { enum: ["create", "delete"] },
+                            },
+                            optionalProperties: {
+                                value: {},
+                            }
+                        },
+                    },
+                },
+            },
+        },
     },
 };
 

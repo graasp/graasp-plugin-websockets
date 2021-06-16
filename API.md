@@ -71,13 +71,18 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
             "name": "<errorName>",
             "message": "<errorMessage",
         },
-        "request": { /* ... client request copy */ },
+        "request": { /* optional, client request copy */ },
     }
     ```
     where:
     - `<responseStatus>` represents the request completion status, either `success` or `error`
     - the `error` field is optional: if and only if the `<responseStatus>` is `error`, then the `error` field is populated, otherwise it is `undefined`. The error has a name and a descriptive message
-    - the `request` field is populated with a copy of the client request object that generated this response. If the request could not be parsed into a valid object (as defined in (4)), the raw request data is sent back in this field.
+    - the `request` field is optional and it is populated with a copy of the client request object that generated this response. If the request could not be parsed into a valid object, `error.name` is set to `INVALID_REQUEST` and the `request` field is left `undefined`
+    
+    Possible error messages include:
+    - `ACCESS_DENIED`: the client is not allowed to access the requested resource
+    - `INVALID_REQUEST`: the client sent a request which format was not understood by the server
+    - `NOT_FOUND`: the client or the requested resource was not found on the server
 
 - Real-time updates: notifications sent to the client from a given channel which it is subscribed to.
     ```jsonc

@@ -54,64 +54,60 @@ interface ClientSubscribeOnly extends Message {
  * Restricted error to be sent to clients
  */
 interface Error {
-    name: string,
+    name: "ACCESS_DENIED" | "INVALID_REQUEST" | "NOT_FOUND",
     message: string,
 }
 
 /**
- * Message sent by server
+ * Message sent by server as a response to a {@link ClientMessage}
  */
-interface ServerMessage extends Message {
-    error?: Error
-    channel?: string
-    type?: "sharedItem" | "childItem"
-    action?: "create" | "delete"
-    body?: any
+interface ServerResponse extends Message {
+    type: "response",
+    status: "success" | "error",
+    error?: Error,
+    request?: ClientMessage,
 }
 
 /**
- * Factory to create a server error message
+ * Message sent by server for misc broadcasts unrelated to a channel
  */
-function createErrorMessage(error: Error): ServerMessage {
-    return {
-        realm: "notif",
-        error: error,
-    };
+interface ServerInfo extends Message {
+    type: "info",
+    message: string,
+    extra?: any,
 }
 
 /**
- * Factory to create a server payload message
+ * Message sent by server for update notifications sent over a channel
  */
-function createPayloadMessage(data: any): ServerMessage {
-    return {
-        realm: "notif",
-        body: data,
-    };
+interface ServerUpdate extends Message {
+    type: "update",
+    channel: string,
+    body: ItemUpdateBody | MemberUpdateBody,
 }
 
 /**
- * Factory to create a shared item notification
+ * Update body type for Item channels
  */
-function createSharedItemNotif(userId: string, action: "create" | "delete"): ServerMessage {
-    return {
-        realm: "notif",
-        channel: userId,
-        type: "sharedItem",
-        action: action,
-    };
+type ItemUpdateBody = ItemChildUpdateBody
+
+interface ItemChildUpdateBody {
+    entity: "item",
+    kind: "childItem",
+    operation: "create" | "delete",
+    value: any, // should be Item, workaround for JTD schema
 }
 
 /**
- * Factory to create a child item notification
+ * Update body type for Member channels
  */
-function createChildItemNotif(parentId: string, child: Item, action: "create" | "delete"): ServerMessage {
-    return {
-        realm: "notif",
-        channel: parentId,
-        type: "childItem",
-        action: action,
-        body: child,
-    };
+type MemberUpdateBody = MemberSharedWithUpdateBody
+
+interface MemberSharedWithUpdateBody {
+    entity: "member",
+    kind: "sharedWith",
+    operation: "create" | "delete",
+    value: any, // should be Item, workaround for JTD schem
 }
 
 /**
@@ -119,4 +115,65 @@ function createChildItemNotif(parentId: string, child: Item, action: "create" | 
  */
 type ClientMessage = ClientDisconnect | ClientSubscribe | ClientUnsubscribe | ClientSubscribeOnly;
 
-export { ClientMessage, ServerMessage, createErrorMessage, createPayloadMessage, createSharedItemNotif, createChildItemNotif };
+/**
+ * Server message type is union type of all server message subtypes
+ */
+type ServerMessage = ServerResponse | ServerInfo | ServerUpdate
+
+/**
+ * Factories
+ */
+const createServerResponse = (status: ServerResponse["status"], error?: Error, request?: ClientMessage): ServerResponse => ({
+    realm: "notif",
+    type: "response",
+    status,
+    error,
+    request,
+});
+
+const createServerErrorResponse = (error: Error, request?: ClientMessage): ServerResponse =>
+    createServerResponse("error", error, request);
+
+const createServerSuccessResponse = (request: ClientMessage): ServerResponse =>
+    createServerResponse("success", undefined, request);
+
+const createServerInfo = (message: string, extra?: any): ServerInfo => ({
+    realm: "notif",
+    type: "info",
+    message,
+    extra,
+});
+
+const createServerUpdate = (channel: string, body: ServerUpdate["body"]): ServerUpdate => ({
+    realm: "notif",
+    type: "update",
+    channel,
+    body,
+});
+
+const createChildItemUpdate = (parentId: string, operation: ItemUpdateBody["operation"], item: Item): ServerUpdate =>
+    createServerUpdate(parentId, {
+        entity: "item",
+        kind: "childItem",
+        operation,
+        value: item,
+    });
+
+const createSharedWithUpdate = (memberId: string, operation: MemberSharedWithUpdateBody["operation"], sharedItem: Item): ServerUpdate =>
+    createServerUpdate(memberId, {
+        entity: "member",
+        kind: "sharedWith",
+        operation,
+        value: sharedItem,
+    });
+
+export {
+    ClientMessage,
+    ServerMessage,
+    createServerInfo,
+    createServerErrorResponse,
+    createServerSuccessResponse,
+    createChildItemUpdate,
+    createSharedWithUpdate,
+};
+
