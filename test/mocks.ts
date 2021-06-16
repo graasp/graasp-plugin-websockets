@@ -6,7 +6,7 @@
  * @author Alexandre CHAU
  */
 
-import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, MemberType, PermissionLevel, Task, TaskRunner } from 'graasp';
+import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, Task, TaskRunner } from 'graasp';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
@@ -156,7 +156,7 @@ const createMockMember = (extra?) => ({
 });
 
 // mock preHandler to be injected in test fastify instance to simulate authentication
-export const mockSessionPreHandler = async (request, reply) => { 
+export const mockSessionPreHandler = async (request, reply) => {
     request.member = createMockMember();
 };
 

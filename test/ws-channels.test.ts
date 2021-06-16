@@ -134,7 +134,7 @@ describe('Server internal behavior', () => {
 
         // subscribe to channel "a" and await ack
         const ack = clientWait(client, 1);
-        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "a", entity: "item" }
+        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "a", entity: "item" };
         clientSend(client, req);
         const ackMsg = await ack;
         expect(ackMsg).toStrictEqual({

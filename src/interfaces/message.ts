@@ -91,7 +91,7 @@ interface ServerUpdate extends Message {
 /**
  * Update body type for Item channels
  */
-type ItemUpdateBody = ItemChildUpdateBody
+type ItemUpdateBody = ItemChildUpdateBody;
 
 interface ItemChildUpdateBody {
     entity: "item",
@@ -103,7 +103,7 @@ interface ItemChildUpdateBody {
 /**
  * Update body type for Member channels
  */
-type MemberUpdateBody = MemberSharedWithUpdateBody
+type MemberUpdateBody = MemberSharedWithUpdateBody;
 
 interface MemberSharedWithUpdateBody {
     entity: "member",
@@ -120,7 +120,7 @@ type ClientMessage = ClientDisconnect | ClientSubscribe | ClientUnsubscribe | Cl
 /**
  * Server message type is union type of all server message subtypes
  */
-type ServerMessage = ServerResponse | ServerInfo | ServerUpdate
+type ServerMessage = ServerResponse | ServerInfo | ServerUpdate;
 
 /**
  * Factories
