@@ -6,6 +6,7 @@
  * @author Alexandre CHAU
  */
 import WebSocket from 'ws';
+import { Logger } from './interfaces/logger';
 import { MessageSerializer } from './interfaces/message-serializer';
 
 /**
@@ -85,12 +86,14 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
      * Creates a new WebSocketChannels instance
      * @param wsServer Underlying WebSocket.Server
      * @param serdes Message serializer/desserializer for this specific server channels abstraction
+     * @param log Logger output for info, error, debug, ... messages
      * @param heartbeatInterval Time interval in ms between heartbeat checks for lost connections,
      *                          MUST be at least an order of magnitude higher than network RTT
      */
     constructor(wsServer: WebSocket.Server,
         serdes: MessageSerializer<ClientMessageType, ServerMessageType>,
-        heartbeatInterval: number = 30000) {
+        log: Logger = console,
+        heartbeatInterval: number = 30000,) {
 
         this.wsServer = wsServer;
         this.serdes = serdes;
@@ -102,7 +105,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
             // find clients that are not registered anymore
             this.wsServer.clients.forEach(ws => {
                 if (this.subscriptions.get(ws) === undefined) {
-                    console.log(`graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`);
+                    log.log(`graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`);
                     ws.terminate();
                 }
             });
@@ -112,7 +115,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
                 if (client.isAlive === false) {
                     // remove from this instance also
                     this.clientRemove(ws);
-                    console.log(`graasp-websockets: ejecting client ${ws.url}, timeout detected`);
+                    log.log(`graasp-websockets: ejecting client ${ws.url}, timeout detected`);
                     return ws.terminate();
                 }
 
@@ -125,7 +128,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
             this.channels.forEach((channel, name) => {
                 if (channel.removeIfEmpty && channel.subscribers.size === 0) {
                     this.channelDelete(name);
-                    console.log(`graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`);
+                    log.log(`graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`);
                 }
             });
         }, heartbeatInterval);

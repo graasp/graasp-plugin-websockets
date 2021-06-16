@@ -50,23 +50,24 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         itemMemberships: { taskManager: itemMembershipTaskManager },
         taskRunner: runner,
         validateSession,
+        log,
     } = fastify;
 
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
         errorHandler: (error, conn, req, reply) => {
-            console.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection ${conn}...`);
+            log.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection ${conn}...`);
             conn.destroy();
         }
     });
 
-    const wsChannels = new WebSocketChannels(fastify.websocketServer, serdes);
+    const wsChannels = new WebSocketChannels(fastify.websocketServer, serdes, log);
 
     // decorate main fastify instance with websocket channels instance
     fastify.decorate('websocketChannels', wsChannels);
 
     // multi-instance handler
-    const channelsBroker = new MultiInstanceChannelsBroker(wsChannels);
+    const channelsBroker = new MultiInstanceChannelsBroker(wsChannels, log);
 
     // decorate main fastify instance with multi-instance websocket channels broker
     fastify.decorate('websocketChannelsBroker', channelsBroker);
