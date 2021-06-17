@@ -62,6 +62,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
     // must await this register call: otherwise decorated properties on `fastify` are not available
     await fastify.register(fws, {
         errorHandler: (error, conn, req, reply) => {
+            // remove client if needed
+            if (wsChannels) { wsChannels.clientRemove(conn.socket); }
             log.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection ${conn}...`);
             conn.destroy();
         }
@@ -145,7 +147,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
                     case "subscribe": {
                         const canUseOrError = await userCanUseChannel(request, member);
                         if (canUseOrError !== "ok") {
-                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError));
+                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError, request));
                             return;
                         }
 
@@ -156,14 +158,14 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
                         const msg = (wsChannels.clientSubscribe(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse(notFoundError(request.channel));
+                            createServerErrorResponse(notFoundError(request.channel), request);
                         wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "subscribeOnly": {
                         const canUseOrError = await userCanUseChannel(request, member);
                         if (canUseOrError !== "ok") {
-                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError));
+                            wsChannels.clientSend(client, createServerErrorResponse(canUseOrError, request));
                             return;
                         }
 
@@ -174,14 +176,14 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
 
                         const msg = (wsChannels.clientSubscribeOnly(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse(notFoundError(request.channel));
+                            createServerErrorResponse(notFoundError(request.channel), request);
                         wsChannels.clientSend(client, msg);
                         break;
                     }
                     case "unsubscribe": {
                         const msg = (wsChannels.clientUnsubscribe(client, request.channel)) ?
                             createServerSuccessResponse(request) :
-                            createServerErrorResponse(notFoundError(request.channel));
+                            createServerErrorResponse(notFoundError(request.channel), request);
                         wsChannels.clientSend(client, msg);
                         // preemptively remove channel if empty
                         wsChannels.channelDelete(request.channel, true);

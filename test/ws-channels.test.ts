@@ -554,4 +554,29 @@ describe('Graasp-specific behaviour', () => {
         client.close();
         server.close();
     });
+
+    describe("Erroneous cases are handled", () => {
+        test("Subscribing to a member channel that is not client itself is forbidden", async () => {
+            const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+            const server = await createWsFastifyInstance(config);
+            const client = await createWsClient(config);
+
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "anotherMemberId", entity: "member" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "ACCESS_DENIED",
+                    message: "Unable to subscribe to channel anotherMemberId: user access denied for this channel",
+                },
+                request: req,
+            });
+
+            client.close();
+            server.close();
+        });
+    });
 });
