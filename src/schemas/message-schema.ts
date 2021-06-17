@@ -66,36 +66,7 @@ const serverMessageSchema: JTDSchemaType<ServerMessage> = {
                         message: { type: "string" },
                     },
                 },
-                request: {
-                    discriminator: "action",
-                    mapping: {
-                        "disconnect": {
-                            properties: {
-                                realm: { enum: ["notif"] },
-                            },
-                        },
-                        "subscribe": {
-                            properties: {
-                                realm: { enum: ["notif"] },
-                                channel: { type: "string" },
-                                entity: { enum: ["item", "member"] },
-                            },
-                        },
-                        "unsubscribe": {
-                            properties: {
-                                realm: { enum: ["notif"] },
-                                channel: { type: "string" },
-                            },
-                        },
-                        "subscribeOnly": {
-                            properties: {
-                                realm: { enum: ["notif"] },
-                                channel: { type: "string" },
-                                entity: { enum: ["item", "member"] },
-                            },
-                        },
-                    },
-                },
+                request: clientMessageSchema,
             },
         },
         "info": {
