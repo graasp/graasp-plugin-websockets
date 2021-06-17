@@ -9,11 +9,11 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import { FastifyInstance } from 'fastify';
-import { Item } from 'graasp';
+import { Item, ItemMembership } from 'graasp';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
-import { createMockItem, mockItemsManager, mockTaskRunner } from './mocks';
+import { createMockItem, createMockItemMembership, mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
@@ -468,6 +468,85 @@ describe('Graasp-specific behaviour', () => {
                 kind: "childItem",
                 op: "create",
                 value: newChildItem,
+            },
+        });
+
+
+        client.close();
+        server.close();
+    });
+
+    test("Deleting an item with a parent triggers notification on parent channel", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const server = await createWsFastifyInstance(config);
+        const client = await createWsClient(config);
+
+        const ack = clientWait(client, 1);
+        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "parent", entity: "item" };
+        clientSend(client, req);
+        expect(await ack).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
+
+        // expect next message to be parent notif
+        const notif = clientWait(client, 1);
+        // simulate delete child event on task runner
+        const deletedChildItem: Item = createMockItem();
+        deletedChildItem.path = "parent.child";
+        deletedChildItem.extra = { foo: "bar" };
+        await mockTaskRunner.runPost(mockItemsManager.taskManager.getDeleteTaskName(), deletedChildItem);
+        expect(await notif).toStrictEqual({
+            realm: "notif",
+            type: "update",
+            channel: "parent",
+            body: {
+                entity: "item",
+                kind: "childItem",
+                op: "delete",
+                value: deletedChildItem,
+            },
+        });
+
+
+        client.close();
+        server.close();
+    });
+
+    test("Creating an item membership triggers notification on member channel", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const server = await createWsFastifyInstance(config);
+        const client = await createWsClient(config);
+
+        const ack = clientWait(client, 1);
+        const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "mockMemberId", entity: "member" };
+        clientSend(client, req);
+        expect(await ack).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req,
+        });
+
+        // expect next message to be parent notif
+        const notif = clientWait(client, 1);
+        // simulate create item membership on task runner
+        const newMembership: ItemMembership = createMockItemMembership();
+        newMembership.memberId = "mockMemberId";
+        await mockTaskRunner.runPost(mockItemMembershipsManager.taskManager.getCreateTaskName(), newMembership);
+        // expected object is mock item created in mocks.ts
+        const mockItem = createMockItem();
+        expect(await notif).toStrictEqual({
+            realm: "notif",
+            type: "update",
+            channel: "mockMemberId",
+            body: {
+                entity: "member",
+                kind: "sharedWith",
+                op: "create",
+                value: mockItem,
             },
         });
 

@@ -7,7 +7,7 @@
  */
 
 import { FastifyLoggerInstance } from 'fastify';
-import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, PostHookHandlerType, PreHookHandlerType, Task, TaskHookHandlerHelpers, TaskRunner } from 'graasp';
+import { Actor, Database, ItemMembership, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, PostHookHandlerType, PreHookHandlerType, Task, TaskHookHandlerHelpers, TaskRunner } from 'graasp';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
@@ -16,21 +16,21 @@ import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, Item
 const createPromise = <T>(createItemFn: () => T) => new Promise<T>((resolve, reject) => resolve(createItemFn()));
 
 export const createMockItem = (extra?) => ({
-    id: "mock",
-    name: "mock",
-    description: "mock",
-    type: "mock",
-    path: "mock",
-    extra,
-    creator: "mock",
-    createdAt: "mock",
-    updatedAt: "mock",
+    id: "mockItemId",
+    name: "mockItemName",
+    description: "mockItemDescription",
+    type: "mockItemType",
+    path: "mockItemPath",
+    extra: extra !== undefined ? extra : { foo: "bar" },
+    creator: "mockItemCreator",
+    createdAt: "mockItemCreatedAt",
+    updatedAt: "mockItemUpdatedAt",
 });
 
 const createMockItemArray = () => [createMockItem()];
 
 const createMockTask = <T>(actor, createResultFn: () => T): Task<Actor, T> => ({
-    name: "mock",
+    name: "mockTaskName",
     actor: actor,
     status: 'NEW',
     result: createResultFn(),
@@ -75,14 +75,14 @@ const mockItemService: ItemService = {
     move: jest.fn((item, transactionHandler) => createPromise(() => { })),
 };
 
-const createMockItemMembership = () => ({
-    id: "mock",
-    memberId: "mock",
-    itemPath: "mock",
-    permission: PermissionLevel.Admin,
-    creator: "mock",
-    createdAt: "mock",
-    updatedAt: "mock",
+export const createMockItemMembership = (): ItemMembership => ({
+    id: "mockMembershipId",
+    memberId: "mockMembershipMemberId",
+    itemPath: "mockMembershipItemPath",
+    permission: "admin" as PermissionLevel, // hack to avoid runtime TypeError
+    creator: "mockMembershipCreator",
+    createdAt: "mockMembershipCreatedAt",
+    updatedAt: "mockMembershipUpdatedAt",
 });
 
 const createMockItemMembershipArray = () => [createMockItemMembership()];
@@ -200,13 +200,13 @@ export const mockDatabase: Database = {
 };
 
 const createMockMember = (extra?) => ({
-    name: "mock",
-    email: "mock",
-    id: "mock",
+    name: "mockMemberName",
+    email: "mockMemberEmail",
+    id: "mockMemberId",
     type: "individual",
     extra,
-    createdAt: "mock",
-    updatedAt: "mock",
+    createdAt: "mockMemberCreatedAt",
+    updatedAt: "mockMemberUpdatedAt",
 });
 
 // mock preHandler to be injected in test fastify instance to simulate authentication
