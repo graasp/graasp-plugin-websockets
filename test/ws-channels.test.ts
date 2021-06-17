@@ -554,4 +554,36 @@ describe('Graasp-specific behaviour', () => {
         client.close();
         server.close();
     });
+
+    describe("Erroneous cases are handled", () => {
+        let testEnv: any;
+
+        beforeEach(async () => {
+            testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+            testEnv.server = await createWsFastifyInstance(testEnv.config);
+            testEnv.client = await createWsClient(testEnv.config);
+        });
+
+        test("Subscribing to a member channel that is not client itself is forbidden", async () => {
+            const { server, client } = testEnv;
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "anotherMemberId", entity: "member" };
+            clientSend(client, req);
+            expect (await req).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "ACCESS_DENIED",
+                    message: "",
+                },
+                request: req,
+            });
+        });
+
+        afterEach(() => {
+            testEnv.server.close();
+            testEnv.client.close();
+        });
+    });
 });
