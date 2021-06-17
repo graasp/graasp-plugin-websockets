@@ -117,7 +117,7 @@ const serverMessageSchema: JTDSchemaType<ServerMessage> = {
                         "item": {
                             properties: {
                                 kind: { enum: ["childItem"] },
-                                operation: { enum: ["create", "delete"] },
+                                op: { enum: ["create", "delete"] },
                             },
                             optionalProperties: {
                                 value: {},
@@ -126,7 +126,7 @@ const serverMessageSchema: JTDSchemaType<ServerMessage> = {
                         "member": {
                             properties: {
                                 kind: { enum: ["sharedWith"] },
-                                operation: { enum: ["create", "delete"] },
+                                op: { enum: ["create", "delete"] },
                             },
                             optionalProperties: {
                                 value: {},

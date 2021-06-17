@@ -15,7 +15,7 @@ import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, Item
 
 const createPromise = <T>(createItemFn: () => T) => new Promise<T>((resolve, reject) => resolve(createItemFn()));
 
-const createMockItem = (extra?) => ({
+export const createMockItem = (extra?) => ({
     id: "mock",
     name: "mock",
     description: "mock",
@@ -38,15 +38,15 @@ const createMockTask = <T>(actor, createResultFn: () => T): Task<Actor, T> => ({
 });
 
 const mockItemTaskManager: ItemTaskManager = {
-    getCreateTaskName: () => "create",
-    getGetTaskName: () => "get",
-    getUpdateTaskName: () => "update",
-    getDeleteTaskName: () => "delete",
-    getMoveTaskName: () => "move",
-    getCopyTaskName: () => "copy",
-    getGetChildrenTaskName: () => "getChildren",
-    getGetOwnTaskName: () => "getOwn",
-    getGetSharedWithTaskName: () => "getSharedWith",
+    getCreateTaskName: () => "itemCreate",
+    getGetTaskName: () => "itemGet",
+    getUpdateTaskName: () => "itemUpdate",
+    getDeleteTaskName: () => "itemDelete",
+    getMoveTaskName: () => "itemMove",
+    getCopyTaskName: () => "itemCopy",
+    getGetChildrenTaskName: () => "itemGetChildren",
+    getGetOwnTaskName: () => "itemGetOwn",
+    getGetSharedWithTaskName: () => "itemGetSharedWith",
     createCreateTask: jest.fn((actor, object) => createMockTask(actor, createMockItem)),
     createGetTask: jest.fn((actor, objetId) => createMockTask(actor, createMockItem)),
     createUpdateTask: jest.fn((actor, objectId, object) => createMockTask(actor, createMockItem)),
@@ -88,11 +88,11 @@ const createMockItemMembership = () => ({
 const createMockItemMembershipArray = () => [createMockItemMembership()];
 
 const mockItemMembershipTaskManager: ItemMembershipTaskManager = {
-    getCreateTaskName: () => "create",
-    getGetTaskName: () => "get",
-    getUpdateTaskName: () => "update",
-    getDeleteTaskName: () => "delete",
-    getGetOfItemTaskName: () => "getOfItem",
+    getCreateTaskName: () => "membershipCreate",
+    getGetTaskName: () => "membershipGet",
+    getUpdateTaskName: () => "membershipUpdate",
+    getDeleteTaskName: () => "membershipDelete",
+    getGetOfItemTaskName: () => "membershipGetOfItem",
     createCreateTask: jest.fn((actor, object) => createMockTask(actor, createMockItemMembership)),
     createGetTask: jest.fn((actor, objectId) => createMockTask(actor, createMockItemMembership)),
     createUpdateTask: jest.fn((actor, objectId, object) => createMockTask(actor, createMockItemMembership)),
@@ -145,8 +145,8 @@ const mockTaskRunnerState = {
 declare module 'graasp' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface TaskRunner<A extends Actor> {
-        runPre<T>(taskName: string, param: T)
-        runPost<T>(taskName: string, param: T)
+        runPre<T>(taskName: string, param: T): Promise<void[]>
+        runPost<T>(taskName: string, param: T): Promise<void[]>
         clearHandlers()
     }
 }
@@ -190,8 +190,8 @@ export const mockTaskRunner: TaskRunner<Actor> = {
             postHandlers.set(taskName, taskPostHandlers.filter(h => h !== handler));
         }
     },
-    runPre: <T>(taskName: string, param: T) => mockTaskRunnerState.handlers.pre.get(taskName)?.forEach(h => h(param, mockActor, mockHelpers)),
-    runPost: <T>(taskName: string, param: T) => mockTaskRunnerState.handlers.post.get(taskName)?.forEach(h => h(param, mockActor, mockHelpers)),
+    runPre: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.pre.get(taskName)?.map(async h => await h(param, mockActor, mockHelpers)) ?? []),
+    runPost: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.post.get(taskName)?.map(async h => await h(param, mockActor, mockHelpers)) ?? []),
     clearHandlers: () => ["pre", "post"].forEach(p => mockTaskRunnerState.handlers[p].clear()),
 };
 

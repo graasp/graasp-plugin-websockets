@@ -96,7 +96,7 @@ type ItemUpdateBody = ItemChildUpdateBody;
 interface ItemChildUpdateBody {
     entity: "item",
     kind: "childItem",
-    operation: "create" | "delete",
+    op: "create" | "delete",
     value: any, // should be Item, workaround for JTD schema
 }
 
@@ -108,7 +108,7 @@ type MemberUpdateBody = MemberSharedWithUpdateBody;
 interface MemberSharedWithUpdateBody {
     entity: "member",
     kind: "sharedWith",
-    operation: "create" | "delete",
+    op: "create" | "delete",
     value: any, // should be Item, workaround for JTD schem
 }
 
@@ -153,19 +153,19 @@ const createServerUpdate = (channel: string, body: ServerUpdate["body"]): Server
     body,
 });
 
-const createChildItemUpdate = (parentId: string, operation: ItemUpdateBody["operation"], item: Item): ServerUpdate =>
+const createChildItemUpdate = (parentId: string, op: ItemUpdateBody["op"], item: Item): ServerUpdate =>
     createServerUpdate(parentId, {
         entity: "item",
         kind: "childItem",
-        operation,
+        op,
         value: item,
     });
 
-const createSharedWithUpdate = (memberId: string, operation: MemberSharedWithUpdateBody["operation"], sharedItem: Item): ServerUpdate =>
+const createSharedWithUpdate = (memberId: string, op: MemberSharedWithUpdateBody["op"], sharedItem: Item): ServerUpdate =>
     createServerUpdate(memberId, {
         entity: "member",
         kind: "sharedWith",
-        operation,
+        op,
         value: sharedItem,
     });
 
