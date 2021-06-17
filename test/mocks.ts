@@ -6,7 +6,8 @@
  * @author Alexandre CHAU
  */
 
-import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, Task, TaskRunner } from 'graasp';
+import { FastifyLoggerInstance } from 'fastify';
+import { Actor, Database, ItemMembershipService, ItemMembershipTaskManager, ItemService, ItemTaskManager, PermissionLevel, PostHookHandlerType, PreHookHandlerType, Task, TaskHookHandlerHelpers, TaskRunner } from 'graasp';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
@@ -132,13 +133,66 @@ export const mockItemMembershipsManager = {
     dbService: mockItemMembershipService,
 };
 
+// mock task runner storage for handlers
+const mockTaskRunnerState = {
+    handlers: {
+        pre: new Map<string, Array<PreHookHandlerType<any, unknown>>>(),
+        post: new Map<string, Array<PostHookHandlerType<any, unknown>>>(),
+    },
+};
+
+// augment mockTaskRunner with ability to run handlers manually for testing
+declare module 'graasp' {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    interface TaskRunner<A extends Actor> {
+        runPre<T>(taskName: string, param: T)
+        runPost<T>(taskName: string, param: T)
+        clearHandlers()
+    }
+}
+
+const mockActor: Actor = {
+    id: "mock",
+};
+
+const mockFastifyLogger: FastifyLoggerInstance = ({
+    ...console,
+    fatal: console.error,
+    child: (bindings) => mockFastifyLogger,
+});
+
+const mockHelpers: TaskHookHandlerHelpers = {
+    log: mockFastifyLogger,
+};
+
 export const mockTaskRunner: TaskRunner<Actor> = {
     runSingle: <T>(task: Task<Actor, T>) => createPromise(() => task.result),
     runMultiple: (tasks: Task<Actor, unknown>[]) => createPromise(() => tasks.map(t => t.result)),
-    setTaskPreHookHandler: (taskName, handler) => { },
-    setTaskPostHookHandler: (taskName, handler) => { },
-    unsetTaskPreHookHandler: (taskName, handler) => { },
-    unsetTaskPostHookHandler: (taskName, handler) => { },
+    setTaskPreHookHandler: (taskName, handler) => {
+        const preHandlers = mockTaskRunnerState.handlers.pre;
+        preHandlers.has(taskName) ? preHandlers.get(taskName)?.push(handler) : preHandlers.set(taskName, [handler]);
+    },
+    setTaskPostHookHandler: (taskName, handler) => {
+        const postHandlers = mockTaskRunnerState.handlers.post;
+        postHandlers.has(taskName) ? postHandlers.get(taskName)?.push(handler) : postHandlers.set(taskName, [handler]);
+    },
+    unsetTaskPreHookHandler: (taskName, handler) => {
+        const preHandlers = mockTaskRunnerState.handlers.pre;
+        const taskPreHandlers = preHandlers.get(taskName);
+        if (taskPreHandlers !== undefined) {
+            preHandlers.set(taskName, taskPreHandlers.filter(h => h !== handler));
+        }
+    },
+    unsetTaskPostHookHandler: (taskName, handler) => {
+        const postHandlers = mockTaskRunnerState.handlers.post;
+        const taskPostHandlers = postHandlers.get(taskName);
+        if (taskPostHandlers !== undefined) {
+            postHandlers.set(taskName, taskPostHandlers.filter(h => h !== handler));
+        }
+    },
+    runPre: <T>(taskName: string, param: T) => mockTaskRunnerState.handlers.pre.get(taskName)?.forEach(h => h(param, mockActor, mockHelpers)),
+    runPost: <T>(taskName: string, param: T) => mockTaskRunnerState.handlers.post.get(taskName)?.forEach(h => h(param, mockActor, mockHelpers)),
+    clearHandlers: () => ["pre", "post"].forEach(p => mockTaskRunnerState.handlers[p].clear()),
 };
 
 export const mockDatabase: Database = {
