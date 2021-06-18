@@ -99,7 +99,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         else if (request.entity === "item") {
             try {
                 const item = await itemDbService.get(request.channel, db.pool);
-                if (item === null) {
+                if (!item) {
                     // item was not found
                     return notFoundError(request.channel);
                 }

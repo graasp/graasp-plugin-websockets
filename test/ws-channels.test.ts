@@ -7,6 +7,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { FastifyInstance } from 'fastify';
 import { Item, ItemMembership } from 'graasp';
@@ -556,10 +557,16 @@ describe('Graasp-specific behaviour', () => {
     });
 
     describe("Erroneous cases are handled", () => {
+        const testEnv: any = {};
+
+        beforeEach(async () => {
+            testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+            testEnv.server = await createWsFastifyInstance(testEnv.config);
+            testEnv.client = await createWsClient(testEnv.config);
+        });
+
         test("Subscribing to a member channel that is not client itself is forbidden", async () => {
-            const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-            const server = await createWsFastifyInstance(config);
-            const client = await createWsClient(config);
+            const { client } = testEnv;
 
             const error = clientWait(client, 1);
             const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "anotherMemberId", entity: "member" };
@@ -574,7 +581,50 @@ describe('Graasp-specific behaviour', () => {
                 },
                 request: req,
             });
+        });
 
+        test("Subscribing to an item that does not exist in database is forbidden", async () => {
+            const { client } = testEnv;
+
+            // setup mock to return null when db fetches invalid item
+            (mockItemsManager.dbService.get as jest.Mock).mockReturnValueOnce(Promise.resolve(null));
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "someInvalidItemId", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "NOT_FOUND",
+                    message: "Unable to subscribe to channel someInvalidItemId: user or channel not found",
+                },
+                request: req,
+            });
+        });
+
+        test("Subscribing to an item which user does not have access to is forbidden", async () => {
+            const { client } = testEnv;
+
+            // setup mock to return false when permission is checked
+            (mockItemMembershipsManager.dbService.canRead as jest.Mock).mockReturnValueOnce(Promise.resolve(false));
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "someUnauthorizedItem", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "ACCESS_DENIED",
+                    message: "Unable to subscribe to channel someUnauthorizedItem: user access denied for this channel",
+                },
+                request: req,
+            });
+        });
+
+        afterEach(async () => {
+            const { client, server } = testEnv;
             client.close();
             server.close();
         });

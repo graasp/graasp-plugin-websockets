@@ -27,11 +27,15 @@ export const createMockItem = (extra?) => ({
     updatedAt: "mockItemUpdatedAt",
 });
 
+export const createMockActor = () => ({
+    id: "mockActorId",
+});
+
 const createMockItemArray = () => [createMockItem()];
 
-const createMockTask = <T>(actor, createResultFn: () => T): Task<Actor, T> => ({
+const createMockTask = <T>(createActorFn: () => Actor, createResultFn: () => T): Task<Actor, T> => ({
     name: "mockTaskName",
-    actor: actor,
+    actor: createActorFn(),
     status: 'NEW',
     result: createResultFn(),
     run: (handler, log) => createPromise(() => { })
@@ -47,32 +51,32 @@ const mockItemTaskManager: ItemTaskManager = {
     getGetChildrenTaskName: () => "itemGetChildren",
     getGetOwnTaskName: () => "itemGetOwn",
     getGetSharedWithTaskName: () => "itemGetSharedWith",
-    createCreateTask: jest.fn((actor, object) => createMockTask(actor, createMockItem)),
-    createGetTask: jest.fn((actor, objetId) => createMockTask(actor, createMockItem)),
-    createUpdateTask: jest.fn((actor, objectId, object) => createMockTask(actor, createMockItem)),
-    createDeleteTask: jest.fn((actor, objectId) => createMockTask(actor, createMockItem)),
-    createMoveTask: jest.fn((actor, itemId) => createMockTask(actor, createMockItem)),
-    createCopyTask: jest.fn((actor, itemId) => createMockTask(actor, createMockItem)),
-    createGetChildrenTask: jest.fn((actor, itemId) => createMockTask(actor, createMockItemArray)),
-    createGetOwnTask: jest.fn((actor) => createMockTask(actor, createMockItemArray)),
-    createGetSharedWithTask: jest.fn((actor) => createMockTask(actor, createMockItemArray)),
+    createCreateTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createGetTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createUpdateTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createDeleteTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createMoveTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createCopyTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItem)),
+    createGetChildrenTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemArray)),
+    createGetOwnTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemArray)),
+    createGetSharedWithTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemArray)),
 };
 
 const mockItemService: ItemService = {
-    get: jest.fn((id, transactionHandler) => createPromise(createMockItem)),
-    getMatchingPath: jest.fn((path, transactionHandler) => createPromise(createMockItem)),
-    getMany: jest.fn((ids, transactionHandler) => createPromise(createMockItemArray)),
-    create: jest.fn((item, transactionHandler) => createPromise(createMockItem)),
-    update: jest.fn((id, data, transactionHandler) => createPromise(createMockItem)),
-    delete: jest.fn((id, transactionHandler) => createPromise(createMockItem)),
-    getNumberOfChildren: jest.fn((item, transactionHandler) => createPromise(() => 0)),
-    getChildren: jest.fn((item, transactionHandler) => createPromise(createMockItemArray)),
-    getNumberOfDescendants: jest.fn((item, transactionHandler) => createPromise(() => 0)),
-    getDescendants: jest.fn((item, transactionHandler) => createPromise(createMockItemArray)),
-    getNumberOfLevelsToFarthestChild: jest.fn((item, transactionHandler) => createPromise(() => 0)),
-    getOwn: jest.fn((memberId, transactionHandler) => createPromise(createMockItemArray)),
-    getSharedWith: jest.fn((memberId, transactionHandler) => createPromise(createMockItemArray)),
-    move: jest.fn((item, transactionHandler) => createPromise(() => { })),
+    get: jest.fn().mockReturnValue(createPromise(createMockItem)),
+    getMatchingPath: jest.fn().mockReturnValue(createPromise(createMockItem)),
+    getMany: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+    create: jest.fn().mockReturnValue(createPromise(createMockItem)),
+    update: jest.fn().mockReturnValue(createPromise(createMockItem)),
+    delete: jest.fn().mockReturnValue(createPromise(createMockItem)),
+    getNumberOfChildren: jest.fn().mockReturnValue(0),
+    getChildren: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+    getNumberOfDescendants: jest.fn().mockReturnValue(0),
+    getDescendants: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+    getNumberOfLevelsToFarthestChild: jest.fn().mockReturnValue(0),
+    getOwn: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+    getSharedWith: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+    move: jest.fn(),
 };
 
 export const createMockItemMembership = (): ItemMembership => ({
@@ -93,28 +97,28 @@ const mockItemMembershipTaskManager: ItemMembershipTaskManager = {
     getUpdateTaskName: () => "membershipUpdate",
     getDeleteTaskName: () => "membershipDelete",
     getGetOfItemTaskName: () => "membershipGetOfItem",
-    createCreateTask: jest.fn((actor, object) => createMockTask(actor, createMockItemMembership)),
-    createGetTask: jest.fn((actor, objectId) => createMockTask(actor, createMockItemMembership)),
-    createUpdateTask: jest.fn((actor, objectId, object) => createMockTask(actor, createMockItemMembership)),
-    createDeleteTask: jest.fn((actor, objectId) => createMockTask(actor, createMockItemMembership)),
-    createGetOfItemTask: jest.fn((actor, itemId) => createMockTask(actor, createMockItemMembershipArray)),
+    createCreateTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemMembership)),
+    createGetTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemMembership)),
+    createUpdateTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemMembership)),
+    createDeleteTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemMembership)),
+    createGetOfItemTask: jest.fn().mockReturnValue(createMockTask(createMockActor, createMockItemMembershipArray)),
 };
 
 const mockItemMembershipService: ItemMembershipService = {
-    getPermissionLevel: jest.fn((memberId, item, transactionHandler) => createPromise(() => PermissionLevel.Admin)),
-    getInherited: jest.fn((memberId, item, transactionHandler) => createPromise(createMockItemMembership)),
-    getAllBelow: jest.fn((memberId, item, transactionHandler) => createPromise(createMockItemMembershipArray)),
-    getInheritedForAll: jest.fn((item, transactionHandler) => createPromise(createMockItemMembershipArray)),
-    canRead: jest.fn((memberId, item, transactionHandler) => createPromise(() => true)),
-    canWrite: jest.fn((memberId, item, transactionHandler) => createPromise(() => true)),
-    canAdmin: jest.fn((memberId, item, transactionHandler) => createPromise(() => true)),
-    get: jest.fn((id, transactionHandler) => createPromise(createMockItemMembership)),
-    create: jest.fn((membership, transactionHandler) => createPromise(createMockItemMembership)),
-    createMany: jest.fn((memberships, transactionHandler) => createPromise(createMockItemMembershipArray)),
-    update: jest.fn((id, permission, transactionHandler) => createPromise(createMockItemMembership)),
-    delete: jest.fn((id, transactionHandler) => createPromise(createMockItemMembership)),
-    deleteManyMatching: jest.fn((memberships, transactionHandler) => createPromise(createMockItemMembershipArray)),
-    moveHousekeeping: jest.fn((item, member, transactionHandler) => createPromise(() => ({
+    getPermissionLevel: jest.fn().mockReturnValue("admin"),
+    getInherited: jest.fn().mockReturnValue(createPromise(createMockItemMembership)),
+    getAllBelow: jest.fn().mockReturnValue(createPromise(createMockItemMembershipArray)),
+    getInheritedForAll: jest.fn().mockReturnValue(createPromise(createMockItemMembershipArray)),
+    canRead: jest.fn().mockReturnValue(true),
+    canWrite: jest.fn().mockReturnValue(true),
+    canAdmin: jest.fn().mockReturnValue(true),
+    get: jest.fn().mockReturnValue(createPromise(createMockItemMembership)),
+    create: jest.fn().mockReturnValue(createPromise(createMockItemMembership)),
+    createMany: jest.fn().mockReturnValue(createPromise(createMockItemMembershipArray)),
+    update: jest.fn().mockReturnValue(createPromise(createMockItemMembership)),
+    delete: jest.fn().mockReturnValue(createPromise(createMockItemMembership)),
+    deleteManyMatching: jest.fn().mockReturnValue(createPromise(createMockItemMembershipArray)),
+    moveHousekeeping: jest.fn().mockReturnValue(createPromise(() => ({
         inserts: createMockItemMembershipArray(),
         deletes: createMockItemMembershipArray(),
     }))),
@@ -151,10 +155,6 @@ declare module 'graasp' {
     }
 }
 
-const mockActor: Actor = {
-    id: "mock",
-};
-
 const mockFastifyLogger: FastifyLoggerInstance = ({
     ...console,
     fatal: console.error,
@@ -190,8 +190,8 @@ export const mockTaskRunner: TaskRunner<Actor> = {
             postHandlers.set(taskName, taskPostHandlers.filter(h => h !== handler));
         }
     },
-    runPre: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.pre.get(taskName)?.map(async h => await h(param, mockActor, mockHelpers)) ?? []),
-    runPost: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.post.get(taskName)?.map(async h => await h(param, mockActor, mockHelpers)) ?? []),
+    runPre: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.pre.get(taskName)?.map(async h => await h(param, createMockActor(), mockHelpers)) ?? []),
+    runPost: <T>(taskName: string, param: T) => Promise.all(mockTaskRunnerState.handlers.post.get(taskName)?.map(async h => await h(param, createMockActor(), mockHelpers)) ?? []),
     clearHandlers: () => ["pre", "post"].forEach(p => mockTaskRunnerState.handlers[p].clear()),
 };
 
@@ -216,4 +216,4 @@ export const mockSessionPreHandler = async (request, reply) => {
 
 // Signature of @types/graasp/plugins/auth/interfaces/auth.d.ts is wrong! Force return of Promise
 // instead of void to ensure termination (https://www.fastify.io/docs/latest/Hooks/#prehandler).
-export const mockValidateSession = jest.fn((request, reply) => Promise.resolve());
+export const mockValidateSession = jest.fn().mockReturnValue(Promise.resolve());
