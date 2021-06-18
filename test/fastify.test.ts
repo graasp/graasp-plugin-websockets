@@ -42,7 +42,7 @@ test('fastify validates body response instead of request on GET endpoint', async
                     reject(err.message);
                 }
             });
-            instance.get(config.prefix, { websocket: true, schema }, (connection, req) => {
+            instance.get(config.prefix ?? "/ws", { websocket: true, schema }, (connection, req) => {
                 /* noop */
             });
         }).then(_ => {
@@ -65,7 +65,7 @@ test('fastify-websocket cannot accept POST requests for websocket connections', 
     const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
     const test = createFastifyInstance(config, async instance => {
         await instance.register(fws);
-        instance.post(config.prefix, { websocket: true }, (connection, req) => {
+        instance.post(config.prefix ?? "/ws", { websocket: true }, (connection, req) => {
             throw new Error('This line should never be reached, the server should not be able to start');
         });
     });
