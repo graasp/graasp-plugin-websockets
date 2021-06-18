@@ -9,12 +9,12 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import { Item, ItemMembership } from 'graasp';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
-import { createMockItem, createMockItemMembership, mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
+import { createMockFastifyLogger, createMockItem, createMockItemMembership, mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
 import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
@@ -25,6 +25,34 @@ afterEach(() => {
 });
 
 describe('Server internal behavior', () => {
+    test("Prefix option is used if present, otherwise default is used", async () => {
+        const configWithPrefix: TestConfig = {
+            host: '127.0.0.1',
+            port: portGen.getNewPort(),
+            prefix: '/testPrefix',
+        };
+        const serverWithPrefix = await createWsFastifyInstance(configWithPrefix);
+        const clientWithPrefix = await createWsClient(configWithPrefix);
+        const res1 = new Promise(resolve => clientWithPrefix.on("pong", resolve));
+        clientWithPrefix.send('ping');
+        expect(res1).resolves.not.toThrow();
+
+        const configNoPrefix: TestConfig = {
+            host: '127.0.0.1',
+            port: portGen.getNewPort(),
+        };
+        const serverNoPrefix = await createWsFastifyInstance(configNoPrefix);
+        const clientNoPrefix = await createWsClient(configNoPrefix);
+        const res2 = new Promise(resolve => clientWithPrefix.on("pong", resolve));
+        clientNoPrefix.send('ping');
+        expect(res2)
+
+        clientWithPrefix.close();
+        serverWithPrefix.close();
+        clientNoPrefix.close();
+        serverNoPrefix.close();
+    });
+
     test("Adding / removing a channel is registered", () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         const { channels: server, wss } = createWsChannels(config);
@@ -556,6 +584,66 @@ describe('Graasp-specific behaviour', () => {
         server.close();
     });
 
+    test("Client using subscribeOnly after subscribe on 2 channels only receives from last", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const server = await createWsFastifyInstance(config);
+        const client = await createWsClient(config);
+
+        // subscribe to first channel
+        const ack1 = clientWait(client, 1);
+        const req1: ClientMessage = { realm: "notif", action: "subscribe", channel: "parent1", entity: "item" };
+        clientSend(client, req1);
+        expect(await ack1).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req1,
+        });
+
+        // subscribe ONLY to second channel
+        const ack2 = clientWait(client, 1);
+        const req2: ClientMessage = { realm: "notif", action: "subscribeOnly", channel: "parent2", entity: "item" };
+        clientSend(client, req2);
+        expect(await ack2).toStrictEqual({
+            realm: "notif",
+            type: "response",
+            status: "success",
+            request: req2,
+        });
+
+        // expect next message to be parent notif on channel 2 only
+        const notif = clientWait(client, 1);
+
+        // simulate create child event 1 on task runner
+        const newChildItem1: Item = createMockItem();
+        newChildItem1.path = "parent1.child";
+        newChildItem1.extra = { foo: "bar1" };
+        await mockTaskRunner.runPost(mockItemsManager.taskManager.getCreateTaskName(), newChildItem1);
+
+        // simulate create child event 2 on task runner
+        const newChildItem2: Item = createMockItem();
+        newChildItem2.path = "parent2.child";
+        newChildItem2.extra = { foo: "bar2" };
+        await mockTaskRunner.runPost(mockItemsManager.taskManager.getCreateTaskName(), newChildItem2);
+
+        // should only receive last notif
+        expect(await notif).toStrictEqual({
+            realm: "notif",
+            type: "update",
+            channel: "parent2",
+            body: {
+                entity: "item",
+                kind: "childItem",
+                op: "create",
+                value: newChildItem2,
+            },
+        });
+
+
+        client.close();
+        server.close();
+    });
+
     describe("Erroneous cases are handled", () => {
         const testEnv: any = {};
 
@@ -621,6 +709,174 @@ describe('Graasp-specific behaviour', () => {
                 },
                 request: req,
             });
+        });
+
+        test("Subscribing ONLY to a member channel that is not client itself is forbidden", async () => {
+            const { client } = testEnv;
+
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribeOnly", channel: "anotherMemberId", entity: "member" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "ACCESS_DENIED",
+                    message: "Unable to subscribe to channel anotherMemberId: user access denied for this channel",
+                },
+                request: req,
+            });
+        });
+
+        test("Subscribing ONLY to an item that does not exist in database is forbidden", async () => {
+            const { client } = testEnv;
+
+            // setup mock to return null when db fetches invalid item
+            (mockItemsManager.dbService.get as jest.Mock).mockReturnValueOnce(Promise.resolve(null));
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribeOnly", channel: "someInvalidItemId", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "NOT_FOUND",
+                    message: "Unable to subscribe to channel someInvalidItemId: user or channel not found",
+                },
+                request: req,
+            });
+        });
+
+        test("Subscribing ONLY to an item which user does not have access to is forbidden", async () => {
+            const { client } = testEnv;
+
+            // setup mock to return false when permission is checked
+            (mockItemMembershipsManager.dbService.canRead as jest.Mock).mockReturnValueOnce(Promise.resolve(false));
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribeOnly", channel: "someUnauthorizedItem", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "ACCESS_DENIED",
+                    message: "Unable to subscribe to channel someUnauthorizedItem: user access denied for this channel",
+                },
+                request: req,
+            });
+        });
+
+        test("Subscribing to a channel when the user or channel doesn't exist anymore triggers not found error", async () => {
+            const { server, client } = testEnv;
+
+            // force flush users
+            server.websocketChannels.channels.clear();
+            server.websocketChannels.subscriptions.clear();
+
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "someItemId", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "NOT_FOUND",
+                    message: "Unable to subscribe to channel someItemId: user or channel not found",
+                },
+                request: req,
+            });
+        });
+
+        test("Subscribing ONLY to a channel when the user or channel doesn't exist anymore triggers not found error", async () => {
+            const { server, client } = testEnv;
+
+            // force flush users
+            server.websocketChannels.channels.clear();
+            server.websocketChannels.subscriptions.clear();
+
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribeOnly", channel: "someItemId", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "NOT_FOUND",
+                    message: "Unable to subscribe to channel someItemId: user or channel not found",
+                },
+                request: req,
+            });
+        });
+
+        test("Unsubscribing from a channel that doesn't exist triggers not found error", async () => {
+            const { server, client } = testEnv;
+
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "unsubscribe", channel: "someNonExistentItemId" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "NOT_FOUND",
+                    message: "Unable to subscribe to channel someNonExistentItemId: user or channel not found",
+                },
+                request: req,
+            });
+        });
+
+        test("Database crash while fetching item triggers server error response", async () => {
+            const { client } = testEnv;
+
+            // setup mock to fail DB fetch and raise error by returning rejected error
+            (mockItemsManager.dbService.get as jest.Mock).mockRejectedValueOnce(new Error("Mock DB error"));
+            const error = clientWait(client, 1);
+            const req: ClientMessage = { realm: "notif", action: "subscribe", channel: "someItemId", entity: "item" };
+            clientSend(client, req);
+            expect(await error).toStrictEqual({
+                realm: "notif",
+                type: "response",
+                status: "error",
+                error: {
+                    name: "SERVER_ERROR",
+                    message: "Database error",
+                },
+                request: req,
+            });
+        });
+
+        test("Unexpected server error is caught by top-level error handler", async () => {
+            const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+
+            // setup logger with spy on error output, inject it into server
+            const spiedLogger: FastifyLoggerInstance = createMockFastifyLogger();
+            let logErrorSpy = jest.spyOn(spiedLogger, "error");
+            const server = await createWsFastifyInstance(config, async instance => {
+                instance.log = spiedLogger;
+
+                // simulate server error
+                instance.addHook("preHandler", (req, res) => {
+                    throw new Error("Mock server error");
+                });
+            });
+
+            const client = await createWsClient(config);
+
+            const req = { some: "invalid request" };
+            client.send(JSON.stringify(req));
+
+            await waitForExpect(() => {
+                expect(logErrorSpy).toHaveBeenCalledWith("graasp-websockets: an error occured: Error: Mock server error\n\tDestroying connection")
+            });
+
+            client.close();
+            server.close();
         });
 
         afterEach(async () => {

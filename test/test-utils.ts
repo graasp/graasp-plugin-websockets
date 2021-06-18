@@ -25,7 +25,7 @@ const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMes
 interface TestConfig {
     host: string,
     port: number,
-    prefix: string,
+    prefix?: string,
 }
 
 /**
@@ -86,7 +86,7 @@ function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000)
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
-async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => new Promise((resolve, reject) => resolve())): Promise<FastifyInstance> {
+async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => Promise.resolve()): Promise<FastifyInstance> {
     const promise = new Promise<FastifyInstance>((resolve, reject) => {
         const server = fastify(/*{ logger: true }*/);
 
@@ -119,11 +119,12 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
  * @param config TestConfig for this server
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInstance> {
+async function createWsFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => Promise.resolve()): Promise<FastifyInstance> {
     return createFastifyInstance(config, async instance => {
         // plugin must be registered inside this function parameter as it cannot be
         // added after the instance has already booted
-        await instance.register(graaspWebSockets, { prefix: config.prefix });
+        await setupFn(instance);
+        await instance.register(graaspWebSockets, config.prefix ? { prefix: config.prefix } : undefined);
     });
 }
 
@@ -133,7 +134,7 @@ async function createWsFastifyInstance(config: TestConfig): Promise<FastifyInsta
  * @param config TestConfig for this server
  */
 function createConnUrl(config: TestConfig): string {
-    return `ws://${config.host}:${config.port}${config.prefix}`;
+    return `ws://${config.host}:${config.port}${config.prefix ?? "/ws"}`;
 }
 
 /**

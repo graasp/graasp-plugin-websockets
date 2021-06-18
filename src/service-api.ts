@@ -64,7 +64,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (fastify
         errorHandler: (error, conn, req, reply) => {
             // remove client if needed
             if (wsChannels) { wsChannels.clientRemove(conn.socket); }
-            log.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection ${conn}...`);
+            log.error(`graasp-websockets: an error occured: ${error}\n\tDestroying connection`);
             conn.destroy();
         }
     });

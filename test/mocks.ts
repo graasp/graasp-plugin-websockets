@@ -155,14 +155,18 @@ declare module 'graasp' {
     }
 }
 
-const mockFastifyLogger: FastifyLoggerInstance = ({
-    ...console,
-    fatal: console.error,
-    child: (bindings) => mockFastifyLogger,
+export const createMockFastifyLogger = (): FastifyLoggerInstance => ({
+    info: (...args: any[]) => { },
+    warn: (...args: any[]) => { },
+    error: (...args: any[]) => { },
+    fatal: (...args: any[]) => { },
+    trace: (...args: any[]) => { },
+    debug: (...args: any[]) => { },
+    child: (bindings) => createMockFastifyLogger(),
 });
 
 const mockHelpers: TaskHookHandlerHelpers = {
-    log: mockFastifyLogger,
+    log: createMockFastifyLogger(),
 };
 
 export const mockTaskRunner: TaskRunner<Actor> = {
