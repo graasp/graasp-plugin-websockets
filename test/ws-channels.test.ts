@@ -34,8 +34,8 @@ describe('Server internal behavior', () => {
         const serverWithPrefix = await createWsFastifyInstance(configWithPrefix);
         const clientWithPrefix = await createWsClient(configWithPrefix);
         const res1 = new Promise(resolve => clientWithPrefix.on("pong", resolve));
-        clientWithPrefix.send('ping');
-        expect(res1).resolves.not.toThrow();
+        clientWithPrefix.ping('withPrefix');
+        expect((await res1 as Buffer).toString()).toStrictEqual('withPrefix');
 
         const configNoPrefix: TestConfig = {
             host: '127.0.0.1',
@@ -43,9 +43,9 @@ describe('Server internal behavior', () => {
         };
         const serverNoPrefix = await createWsFastifyInstance(configNoPrefix);
         const clientNoPrefix = await createWsClient(configNoPrefix);
-        const res2 = new Promise(resolve => clientWithPrefix.on("pong", resolve));
-        clientNoPrefix.send('ping');
-        expect(res2)
+        const res2 = new Promise(resolve => clientNoPrefix.on("pong", resolve));
+        clientNoPrefix.ping('noPrefix');
+        expect((await res2 as Buffer).toString()).toStrictEqual('noPrefix');
 
         clientWithPrefix.close();
         serverWithPrefix.close();
@@ -814,7 +814,7 @@ describe('Graasp-specific behaviour', () => {
         });
 
         test("Unsubscribing from a channel that doesn't exist triggers not found error", async () => {
-            const { server, client } = testEnv;
+            const { client } = testEnv;
 
             const error = clientWait(client, 1);
             const req: ClientMessage = { realm: "notif", action: "unsubscribe", channel: "someNonExistentItemId" };
@@ -856,7 +856,7 @@ describe('Graasp-specific behaviour', () => {
 
             // setup logger with spy on error output, inject it into server
             const spiedLogger: FastifyLoggerInstance = createMockFastifyLogger();
-            let logErrorSpy = jest.spyOn(spiedLogger, "error");
+            const logErrorSpy = jest.spyOn(spiedLogger, "error");
             const server = await createWsFastifyInstance(config, async instance => {
                 instance.log = spiedLogger;
 
@@ -872,7 +872,7 @@ describe('Graasp-specific behaviour', () => {
             client.send(JSON.stringify(req));
 
             await waitForExpect(() => {
-                expect(logErrorSpy).toHaveBeenCalledWith("graasp-websockets: an error occured: Error: Mock server error\n\tDestroying connection")
+                expect(logErrorSpy).toHaveBeenCalledWith("graasp-websockets: an error occured: Error: Mock server error\n\tDestroying connection");
             });
 
             client.close();
