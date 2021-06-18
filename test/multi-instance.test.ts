@@ -6,8 +6,12 @@
  * @author Alexandre CHAU
  */
 
+import waitForExpect from "wait-for-expect";
 import { ClientMessage } from "../src/interfaces/message";
+import { createMockFastifyLogger } from "./mocks";
 import { clientSend, clientWait, createDefaultLocalConfig, createWsClient, createWsFastifyInstance, PortGenerator } from "./test-utils";
+import Redis from 'ioredis';
+import globalConfig from '../src/config';
 
 const portGen = new PortGenerator(5000);
 
@@ -52,8 +56,37 @@ test('Message sent on a multi-instance broker is received by all instances', asy
         expect(value).toStrictEqual({ realm: "notif", type: "info", message: "hello" });
     });
 
+    // broker broadcast should be received by both clients
+    const b1 = clientWait(client1, 1);
+    const b2 = clientWait(client2, 1);
+    instance2.websocketChannelsBroker.dispatch("broadcast", { realm: "notif", type: "info", message: "broadcast" });
+    const values2 = await Promise.all([b1, b2]);
+    values2.forEach(value => {
+        expect(value).toStrictEqual({ realm: "notif", type: "info", message: "broadcast" });
+    });
+
     client1.close();
     client2.close();
     await instance1.close();
     await instance2.close();
+});
+
+test("Message with incorrect format received from Redis triggers log", async () => {
+    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+    const logger = createMockFastifyLogger();
+    const logInfoSpy = jest.spyOn(logger, "info");
+    const server = await createWsFastifyInstance(config, async instance => {
+        instance.log = logger;
+    });
+    const pub = new Redis({
+        port: globalConfig.redis.port,
+        host: globalConfig.redis.host,
+        password: globalConfig.redis.password,
+    });
+    pub.publish(globalConfig.redis.notifChannel, JSON.stringify("Mock invalid redis message"));
+    await waitForExpect(() => {
+        expect(logInfoSpy).toHaveBeenCalledWith(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${ globalConfig.redis.notifChannel }": "Mock invalid redis message"`);
+    });
+    pub.disconnect();
+    server.close();
 });
