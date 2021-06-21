@@ -24,8 +24,8 @@ import { WebSocketChannels } from './ws-channels';
  */
 declare module 'fastify' {
     interface FastifyInstance {
-        websocketChannels: WebSocketChannels<ClientMessage, ServerMessage>;
-        websocketChannelsBroker: MultiInstanceChannelsBroker;
+        websocketChannels?: WebSocketChannels<ClientMessage, ServerMessage>;
+        websocketChannelsBroker?: MultiInstanceChannelsBroker;
     }
 }
 
