@@ -6,12 +6,12 @@
  * @author Alexandre CHAU
  */
 
+import Redis from 'ioredis';
 import waitForExpect from "wait-for-expect";
+import globalConfig from '../src/config';
 import { ClientMessage } from "../src/interfaces/message";
 import { createMockFastifyLogger } from "./mocks";
 import { clientSend, clientWait, createDefaultLocalConfig, createWsClient, createWsFastifyInstance, PortGenerator } from "./test-utils";
-import Redis from 'ioredis';
-import globalConfig from '../src/config';
 
 const portGen = new PortGenerator(5000);
 
@@ -85,7 +85,7 @@ test("Message with incorrect format received from Redis triggers log", async () 
     });
     pub.publish(globalConfig.redis.notifChannel, JSON.stringify("Mock invalid redis message"));
     await waitForExpect(() => {
-        expect(logInfoSpy).toHaveBeenCalledWith(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${ globalConfig.redis.notifChannel }": "Mock invalid redis message"`);
+        expect(logInfoSpy).toHaveBeenCalledWith(`graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${globalConfig.redis.notifChannel}": "Mock invalid redis message"`);
     });
     pub.disconnect();
     server.close();

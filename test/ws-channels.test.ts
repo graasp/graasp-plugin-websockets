@@ -12,10 +12,10 @@
 import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import { Item, ItemMembership } from 'graasp';
 import waitForExpect from 'wait-for-expect';
-import WebSocket from 'ws';
+import WebSocket, { CLOSED, OPEN } from 'ws';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
 import { createMockFastifyLogger, createMockItem, createMockItemMembership, mockItemMembershipsManager, mockItemsManager, mockTaskRunner } from './mocks';
-import { clientSend, clientsWait, clientWait, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
+import { clientSend, clientsWait, clientWait, createConnUrl, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createWsFastifyInstance, PortGenerator, TestConfig } from './test-utils';
 
 const portGen = new PortGenerator(4000);
 
@@ -126,6 +126,23 @@ describe('Server internal behavior', () => {
         wss.close();
     });
 
+    test("Client without subscription mapping is eventually removed by heartbeat", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels, wss } = createWsChannels(config, 100);
+        const client = await createWsClient(config);
+        expect(channels.subscriptions.size).toEqual(1);
+        // forcefully remove mapping
+        channels.subscriptions.forEach((_, ws) => channels.subscriptions.delete(ws));
+        await waitForExpect(() => {
+            // client connection should be eventually terminated
+            expect(client.readyState).toEqual(CLOSED);
+        });
+        // server should not have client anymore
+        expect(channels.wsServer.clients.size).toEqual(0);
+        client.close();
+        wss.close();
+    });
+
     test("Channel with removeIfEmpty is removed when its last subscriber unsubscribes from it", async () => {
         const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
         const server = await createWsFastifyInstance(config);
@@ -220,6 +237,26 @@ describe('Server internal behavior', () => {
 
         client.close();
         await server.close();
+    });
+
+    test("Send on non-existing channel returns false", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels, wss } = createWsChannels(config);
+        expect(channels.channelSend("foo", createServerInfo("hello world"))).toEqual(false);
+        wss.close();
+    });
+
+    test("Send to a non-ready client returns false", async () => {
+        const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+        const { channels, wss } = createWsChannels(config);
+        const client = new WebSocket(createConnUrl(config));
+        expect(channels.clientSend(client, createServerInfo("hello world"))).toEqual(false);
+        await waitForExpect(() => {
+            // wait for client to be ready for proper teardown
+            expect(client.readyState).toEqual(OPEN);
+        });
+        client.close();
+        wss.close();
     });
 });
 

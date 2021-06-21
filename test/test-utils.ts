@@ -222,4 +222,4 @@ function clientSend(client: WebSocket, data: ClientMessage): void {
 }
 
 
-export { TestConfig, PortGenerator, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };
+export { TestConfig, PortGenerator, createConnUrl, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };
