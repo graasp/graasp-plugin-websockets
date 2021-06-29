@@ -1,45 +1,66 @@
 /**
  * graasp-websockets
- * 
+ *
  * Message interface that describe the shape of messages
  * in the {@link WebSocketChannels} abstraction and which
  * are exchanged with clients
- * 
+ *
  * @author Alexandre CHAU
  */
 
-import { Item } from "graasp";
+import { Item } from 'graasp';
+import {
+  ChildItemOperation,
+  EntityName,
+  ServerErrorName,
+  ServerResponseStatus,
+  SharedWithOperation,
+  WS_CLIENT_ACTION_DISCONNECT,
+  WS_CLIENT_ACTION_SUBSCRIBE,
+  WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
+  WS_CLIENT_ACTION_UNSUBSCRIBE,
+  WS_ENTITY_ITEM,
+  WS_ENTITY_MEMBER,
+  WS_REALM_NOTIF,
+  WS_RESPONSE_STATUS_ERROR,
+  WS_RESPONSE_STATUS_SUCCESS,
+  WS_SERVER_TYPE_INFO,
+  WS_SERVER_TYPE_RESPONSE,
+  WS_SERVER_TYPE_UPDATE,
+  WS_UPDATE_KIND_CHILD_ITEM,
+  WS_UPDATE_KIND_SHARED_WITH,
+} from './constants';
 
 /**
  * Default message shape
- * Must have the "notif" type to allow future message types unrelated to notifications
+ * Must have the WS_REALM_NOTIF type to allow future message types unrelated to notifications
  */
 interface Message {
-    realm: "notif",
+  realm: typeof WS_REALM_NOTIF;
 }
 
 /**
  * Message sent by client to disconnect
  */
 interface ClientDisconnect extends Message {
-    action: "disconnect",
+  action: typeof WS_CLIENT_ACTION_DISCONNECT;
 }
 
 /**
  * Message sent by client to subscribe to some channel
  */
 interface ClientSubscribe extends Message {
-    action: "subscribe",
-    channel: string,
-    entity: "item" | "member",
+  action: typeof WS_CLIENT_ACTION_SUBSCRIBE;
+  channel: string;
+  entity: EntityName;
 }
 
 /**
  * Message sent by client to unsubscribe from some channel
  */
 interface ClientUnsubscribe extends Message {
-    action: "unsubscribe",
-    channel: string,
+  action: typeof WS_CLIENT_ACTION_UNSUBSCRIBE;
+  channel: string;
 }
 
 /**
@@ -47,45 +68,45 @@ interface ClientUnsubscribe extends Message {
  * (i.e. it also unsubscribes it from any other channel)
  */
 interface ClientSubscribeOnly extends Message {
-    action: "subscribeOnly",
-    channel: string,
-    entity: "item" | "member",
+  action: typeof WS_CLIENT_ACTION_SUBSCRIBE_ONLY;
+  channel: string;
+  entity: EntityName;
 }
 
 /**
  * Restricted error to be sent to clients
  */
-interface Error {
-    name: "ACCESS_DENIED" | "INVALID_REQUEST" | "NOT_FOUND" | "SERVER_ERROR",
-    message: string,
+export interface Error {
+  name: ServerErrorName;
+  message: string;
 }
 
 /**
  * Message sent by server as a response to a {@link ClientMessage}
  */
-interface ServerResponse extends Message {
-    type: "response",
-    status: "success" | "error",
-    error?: Error,
-    request?: ClientMessage,
+export interface ServerResponse extends Message {
+  type: typeof WS_SERVER_TYPE_RESPONSE;
+  status: ServerResponseStatus;
+  error?: Error;
+  request?: ClientMessage;
 }
 
 /**
  * Message sent by server for misc broadcasts unrelated to a channel
  */
-interface ServerInfo extends Message {
-    type: "info",
-    message: string,
-    extra?: any,
+export interface ServerInfo extends Message {
+  type: typeof WS_SERVER_TYPE_INFO;
+  message: string;
+  extra?: any;
 }
 
 /**
  * Message sent by server for update notifications sent over a channel
  */
-interface ServerUpdate extends Message {
-    type: "update",
-    channel: string,
-    body: ItemUpdateBody | MemberUpdateBody,
+export interface ServerUpdate extends Message {
+  type: typeof WS_SERVER_TYPE_UPDATE;
+  channel: string;
+  body: ItemUpdateBody | MemberUpdateBody;
 }
 
 /**
@@ -94,10 +115,10 @@ interface ServerUpdate extends Message {
 type ItemUpdateBody = ItemChildUpdateBody;
 
 interface ItemChildUpdateBody {
-    entity: "item",
-    kind: "childItem",
-    op: "create" | "delete",
-    value: any, // should be Item, workaround for JTD schema
+  entity: typeof WS_ENTITY_ITEM;
+  kind: typeof WS_UPDATE_KIND_CHILD_ITEM;
+  op: ChildItemOperation;
+  value: any; // should be Item, workaround for JTD schema
 }
 
 /**
@@ -106,77 +127,89 @@ interface ItemChildUpdateBody {
 type MemberUpdateBody = MemberSharedWithUpdateBody;
 
 interface MemberSharedWithUpdateBody {
-    entity: "member",
-    kind: "sharedWith",
-    op: "create" | "delete",
-    value: any, // should be Item, workaround for JTD schem
+  entity: typeof WS_ENTITY_MEMBER;
+  kind: typeof WS_UPDATE_KIND_SHARED_WITH;
+  op: SharedWithOperation;
+  value: any; // should be Item, workaround for JTD schem
 }
 
 /**
  * Client message type is union type of all client message subtypes
  */
-type ClientMessage = ClientDisconnect | ClientSubscribe | ClientUnsubscribe | ClientSubscribeOnly;
+export type ClientMessage =
+  | ClientDisconnect
+  | ClientSubscribe
+  | ClientUnsubscribe
+  | ClientSubscribeOnly;
 
 /**
  * Server message type is union type of all server message subtypes
  */
-type ServerMessage = ServerResponse | ServerInfo | ServerUpdate;
+export type ServerMessage = ServerResponse | ServerInfo | ServerUpdate;
 
 /**
  * Factories
  */
-const createServerResponse = (status: ServerResponse["status"], error?: Error, request?: ClientMessage): ServerResponse => ({
-    realm: "notif",
-    type: "response",
-    status,
-    error,
-    request,
+const createServerResponse = (
+  status: ServerResponse['status'],
+  error?: Error,
+  request?: ClientMessage,
+): ServerResponse => ({
+  realm: WS_REALM_NOTIF,
+  type: WS_SERVER_TYPE_RESPONSE,
+  status,
+  error,
+  request,
 });
 
-const createServerErrorResponse = (error: Error, request?: ClientMessage): ServerResponse =>
-    createServerResponse("error", error, request);
+export const createServerErrorResponse = (
+  error: Error,
+  request?: ClientMessage,
+): ServerResponse =>
+  createServerResponse(WS_RESPONSE_STATUS_ERROR, error, request);
 
-const createServerSuccessResponse = (request: ClientMessage): ServerResponse =>
-    createServerResponse("success", undefined, request);
+export const createServerSuccessResponse = (
+  request: ClientMessage,
+): ServerResponse =>
+  createServerResponse(WS_RESPONSE_STATUS_SUCCESS, undefined, request);
 
-const createServerInfo = (message: string, extra?: any): ServerInfo => ({
-    realm: "notif",
-    type: "info",
-    message,
-    extra,
+export const createServerInfo = (message: string, extra?: any): ServerInfo => ({
+  realm: WS_REALM_NOTIF,
+  type: WS_SERVER_TYPE_INFO,
+  message,
+  extra,
 });
 
-const createServerUpdate = (channel: string, body: ServerUpdate["body"]): ServerUpdate => ({
-    realm: "notif",
-    type: "update",
-    channel,
-    body,
+const createServerUpdate = (
+  channel: string,
+  body: ServerUpdate['body'],
+): ServerUpdate => ({
+  realm: WS_REALM_NOTIF,
+  type: WS_SERVER_TYPE_UPDATE,
+  channel,
+  body,
 });
 
-const createChildItemUpdate = (parentId: string, op: ItemUpdateBody["op"], item: Item): ServerUpdate =>
-    createServerUpdate(parentId, {
-        entity: "item",
-        kind: "childItem",
-        op,
-        value: item,
-    });
+export const createChildItemUpdate = (
+  parentId: string,
+  op: ItemUpdateBody['op'],
+  item: Item,
+): ServerUpdate =>
+  createServerUpdate(parentId, {
+    entity: WS_ENTITY_ITEM,
+    kind: WS_UPDATE_KIND_CHILD_ITEM,
+    op,
+    value: item,
+  });
 
-const createSharedWithUpdate = (memberId: string, op: MemberSharedWithUpdateBody["op"], sharedItem: Item): ServerUpdate =>
-    createServerUpdate(memberId, {
-        entity: "member",
-        kind: "sharedWith",
-        op,
-        value: sharedItem,
-    });
-
-export {
-    ClientMessage,
-    ServerMessage,
-    Error,
-    createServerInfo,
-    createServerErrorResponse,
-    createServerSuccessResponse,
-    createChildItemUpdate,
-    createSharedWithUpdate,
-};
-
+export const createSharedWithUpdate = (
+  memberId: string,
+  op: MemberSharedWithUpdateBody['op'],
+  sharedItem: Item,
+): ServerUpdate =>
+  createServerUpdate(memberId, {
+    entity: WS_ENTITY_MEMBER,
+    kind: WS_UPDATE_KIND_SHARED_WITH,
+    op,
+    value: sharedItem,
+  });

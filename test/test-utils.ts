@@ -1,8 +1,8 @@
 /**
  * graasp-websockets
- * 
+ *
  * Test utility functions and configuration
- * 
+ *
  * @author Alexandre CHAU
  */
 
@@ -13,19 +13,27 @@ import { ClientMessage, ServerMessage } from '../src/interfaces/message';
 import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
-import { mockDatabase, mockItemMembershipsManager, mockItemsManager, mockSessionPreHandler, mockTaskRunner, mockValidateSession } from './mocks';
+import {
+  mockDatabase,
+  mockItemMembershipsManager,
+  mockItemsManager,
+  mockSessionPreHandler,
+  mockTaskRunner,
+  mockValidateSession,
+} from './mocks';
 
 const clientSerdes = { serialize: JSON.stringify, parse: JSON.parse };
-const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> = new AjvMessageSerializer();
+const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> =
+  new AjvMessageSerializer();
 
 /**
  * Test config type
  * Specifies server configuration for test run
  */
 interface TestConfig {
-    host: string,
-    port: number,
-    prefix?: string,
+  host: string;
+  port: number;
+  prefix?: string;
 }
 
 /**
@@ -33,27 +41,27 @@ interface TestConfig {
  * @param options server configuration
  */
 function createDefaultLocalConfig(options: { port: number }): TestConfig {
-    return {
-        host: '127.0.0.1',
-        port: options.port,
-        prefix: '/ws'
-    };
+  return {
+    host: '127.0.0.1',
+    port: options.port,
+    prefix: '/ws',
+  };
 }
 
 /**
  * Utility class to generate new port numbers
  */
 class PortGenerator {
-    port: number;
+  port: number;
 
-    constructor(initPort: number) {
-        this.port = initPort;
-    }
+  constructor(initPort: number) {
+    this.port = initPort;
+  }
 
-    getNewPort(): number {
-        this.port += 1;
-        return this.port;
-    }
+  getNewPort(): number {
+    this.port += 1;
+    return this.port;
+  }
 }
 
 /**
@@ -62,22 +70,33 @@ class PortGenerator {
  * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000): { channels: WebSocketChannels<ClientMessage, ServerMessage>, wss: WebSocket.Server } {
-    const server = new WebSocket.Server({ port: config.port });
-    const wsChannels = new WebSocketChannels(server, serverSerdes, console, heartbeatInterval);
+function createWsChannels(
+  config: TestConfig,
+  heartbeatInterval: number = 30000,
+): {
+  channels: WebSocketChannels<ClientMessage, ServerMessage>;
+  wss: WebSocket.Server;
+} {
+  const server = new WebSocket.Server({ port: config.port });
+  const wsChannels = new WebSocketChannels(
+    server,
+    serverSerdes,
+    console,
+    heartbeatInterval,
+  );
 
-    server.on('connection', ws => {
-        wsChannels.clientRegister(ws);
-    });
+  server.on('connection', (ws) => {
+    wsChannels.clientRegister(ws);
+  });
 
-    server.on('error', err => {
-        throw err;
-    });
+  server.on('error', (err) => {
+    throw err;
+  });
 
-    return {
-        channels: wsChannels,
-        wss: server,
-    };
+  return {
+    channels: wsChannels,
+    wss: server,
+  };
 }
 
 /**
@@ -86,32 +105,36 @@ function createWsChannels(config: TestConfig, heartbeatInterval: number = 30000)
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
-async function createFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => Promise.resolve()): Promise<FastifyInstance> {
-    const promise = new Promise<FastifyInstance>((resolve, reject) => {
-        const server = fastify(/*{ logger: true }*/);
+async function createFastifyInstance(
+  config: TestConfig,
+  setupFn: (instance: FastifyInstance) => Promise<void> = (_) =>
+    Promise.resolve(),
+): Promise<FastifyInstance> {
+  const promise = new Promise<FastifyInstance>((resolve, reject) => {
+    const server = fastify(/*{ logger: true }*/);
 
-        server.items = mockItemsManager;
+    server.items = mockItemsManager;
 
-        server.itemMemberships = mockItemMembershipsManager;
+    server.itemMemberships = mockItemMembershipsManager;
 
-        server.taskRunner = mockTaskRunner;
+    server.taskRunner = mockTaskRunner;
 
-        server.validateSession = mockValidateSession;
-        server.addHook("preHandler", mockSessionPreHandler);
+    server.validateSession = mockValidateSession;
+    server.addHook('preHandler', mockSessionPreHandler);
 
-        server.db = mockDatabase;
+    server.db = mockDatabase;
 
-        setupFn(server).then(() => {
-            server.listen(config.port, config.host, (err, addr) => {
-                if (err) {
-                    reject(err.message);
-                }
-                resolve(server);
-            });
-        });
+    setupFn(server).then(() => {
+      server.listen(config.port, config.host, (err, addr) => {
+        if (err) {
+          reject(err.message);
+        }
+        resolve(server);
+      });
     });
+  });
 
-    return promise;
+  return promise;
 }
 
 /**
@@ -119,13 +142,20 @@ async function createFastifyInstance(config: TestConfig, setupFn: (instance: Fas
  * @param config TestConfig for this server
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(config: TestConfig, setupFn: (instance: FastifyInstance) => Promise<void> = _ => Promise.resolve()): Promise<FastifyInstance> {
-    return createFastifyInstance(config, async instance => {
-        // plugin must be registered inside this function parameter as it cannot be
-        // added after the instance has already booted
-        await setupFn(instance);
-        await instance.register(graaspWebSockets, config.prefix ? { prefix: config.prefix } : undefined);
-    });
+async function createWsFastifyInstance(
+  config: TestConfig,
+  setupFn: (instance: FastifyInstance) => Promise<void> = (_) =>
+    Promise.resolve(),
+): Promise<FastifyInstance> {
+  return createFastifyInstance(config, async (instance) => {
+    // plugin must be registered inside this function parameter as it cannot be
+    // added after the instance has already booted
+    await setupFn(instance);
+    await instance.register(
+      graaspWebSockets,
+      config.prefix ? { prefix: config.prefix } : undefined,
+    );
+  });
 }
 
 /**
@@ -134,7 +164,7 @@ async function createWsFastifyInstance(config: TestConfig, setupFn: (instance: F
  * @param config TestConfig for this server
  */
 function createConnUrl(config: TestConfig): string {
-    return `ws://${config.host}:${config.port}${config.prefix ?? "/ws"}`;
+  return `ws://${config.host}:${config.port}${config.prefix ?? '/ws'}`;
 }
 
 /**
@@ -143,10 +173,10 @@ function createConnUrl(config: TestConfig): string {
  * @returns Promise of websocket client
  */
 async function createWsClient(config: TestConfig): Promise<WebSocket> {
-    return new Promise((resolve, reject) => {
-        const client = new WebSocket(createConnUrl(config));
-        client.on("open", () => resolve(client));
-    });
+  return new Promise((resolve, reject) => {
+    const client = new WebSocket(createConnUrl(config));
+    client.on('open', () => resolve(client));
+  });
 }
 
 /**
@@ -155,9 +185,14 @@ async function createWsClient(config: TestConfig): Promise<WebSocket> {
  * @param numberClients Number of websocket clients to spawn
  * @returns Promise of Array of N websocket clients
  */
-async function createWsClients(config: TestConfig, numberClients: number): Promise<Array<WebSocket>> {
-    const clients = Array(numberClients).fill(null).map(_ => createWsClient(config));
-    return Promise.all(clients);
+async function createWsClients(
+  config: TestConfig,
+  numberClients: number,
+): Promise<Array<WebSocket>> {
+  const clients = Array(numberClients)
+    .fill(null)
+    .map((_) => createWsClient(config));
+  return Promise.all(clients);
 }
 
 /**
@@ -166,38 +201,59 @@ async function createWsClients(config: TestConfig, numberClients: number): Promi
  * @param numberMessages Number of messages to wait for
  * @returns Received message if numberMessages == 1, else array of received messages
  */
-async function clientWait(client: WebSocket, numberMessages: number): Promise<ServerMessage | Array<ServerMessage>> {
-    return new Promise((resolve, reject) => {
-        client.on('error', (err) => {
-            reject(err);
-        });
-
-        if (numberMessages === 1) {
-            client.on('message', (data) => {
-                if (typeof data !== "string") {
-                    reject(new Error(`Parsing error: server message could not be converted: ${data}`));
-                    return;
-                }
-                const msg = clientSerdes.parse(data);
-                if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
-                else resolve(msg);
-            });
-        } else {
-            const buffer: Array<ServerMessage> = [];
-            client.on('message', (data) => {
-                if (typeof data !== "string") {
-                    reject(new Error(`Parsing error: server message could not be converted: ${data}`));
-                    return;
-                }
-                const msg = clientSerdes.parse(data);
-                if (msg === undefined) reject(new Error(`Parsing error: server message could not be converted: ${data}`));
-                else buffer.push(msg);
-                if (buffer.length === numberMessages) {
-                    resolve(buffer);
-                }
-            });
-        }
+async function clientWait(
+  client: WebSocket,
+  numberMessages: number,
+): Promise<ServerMessage | Array<ServerMessage>> {
+  return new Promise((resolve, reject) => {
+    client.on('error', (err) => {
+      reject(err);
     });
+
+    if (numberMessages === 1) {
+      client.on('message', (data) => {
+        if (typeof data !== 'string') {
+          reject(
+            new Error(
+              `Parsing error: server message could not be converted: ${data}`,
+            ),
+          );
+          return;
+        }
+        const msg = clientSerdes.parse(data);
+        if (msg === undefined)
+          reject(
+            new Error(
+              `Parsing error: server message could not be converted: ${data}`,
+            ),
+          );
+        else resolve(msg);
+      });
+    } else {
+      const buffer: Array<ServerMessage> = [];
+      client.on('message', (data) => {
+        if (typeof data !== 'string') {
+          reject(
+            new Error(
+              `Parsing error: server message could not be converted: ${data}`,
+            ),
+          );
+          return;
+        }
+        const msg = clientSerdes.parse(data);
+        if (msg === undefined)
+          reject(
+            new Error(
+              `Parsing error: server message could not be converted: ${data}`,
+            ),
+          );
+        else buffer.push(msg);
+        if (buffer.length === numberMessages) {
+          resolve(buffer);
+        }
+      });
+    }
+  });
 }
 
 /**
@@ -206,10 +262,13 @@ async function clientWait(client: WebSocket, numberMessages: number): Promise<Se
  * @param numberMessages Number of messages to wait for
  * @returns Array containing the received message or array of received messages for each client
  */
-async function clientsWait(clients: Array<WebSocket>, numberMessages: number): Promise<Array<ServerMessage | Array<ServerMessage>>> {
-    return Promise.all(
-        clients.map(client => clientWait(client, numberMessages))
-    );
+async function clientsWait(
+  clients: Array<WebSocket>,
+  numberMessages: number,
+): Promise<Array<ServerMessage | Array<ServerMessage>>> {
+  return Promise.all(
+    clients.map((client) => clientWait(client, numberMessages)),
+  );
 }
 
 /**
@@ -218,8 +277,20 @@ async function clientsWait(clients: Array<WebSocket>, numberMessages: number): P
  * @param data ClientMessage to be sent
  */
 function clientSend(client: WebSocket, data: ClientMessage): void {
-    client.send(clientSerdes.serialize(data));
+  client.send(clientSerdes.serialize(data));
 }
 
-
-export { TestConfig, PortGenerator, createConnUrl, createDefaultLocalConfig, createWsChannels, createWsClient, createWsClients, createFastifyInstance, createWsFastifyInstance, clientWait, clientsWait, clientSend };
+export {
+  TestConfig,
+  PortGenerator,
+  createConnUrl,
+  createDefaultLocalConfig,
+  createWsChannels,
+  createWsClient,
+  createWsClients,
+  createFastifyInstance,
+  createWsFastifyInstance,
+  clientWait,
+  clientsWait,
+  clientSend,
+};

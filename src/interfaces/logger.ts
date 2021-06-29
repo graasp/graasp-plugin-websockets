@@ -1,9 +1,9 @@
 /**
  * graasp-websockets
- * 
+ *
  * Logger interface
  * From https://github.com/kallaspriit/ts-log
- * 
+ *
  * MIT License
  *
  * Copyright (c) 2018 Priit Kallas
@@ -25,14 +25,14 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- * 
+ *
  * @author Alexandre CHAU
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Logger {
-    trace(message: any, ...optionalParams: any[]): void;
-    debug(message: any, ...optionalParams: any[]): void;
-    info(message: any, ...optionalParams: any[]): void;
-    warn(message: any, ...optionalParams: any[]): void;
-    error(message: any, ...optionalParams: any[]): void;
+  trace(message: any, ...optionalParams: any[]): void;
+  debug(message: any, ...optionalParams: any[]): void;
+  info(message: any, ...optionalParams: any[]): void;
+  warn(message: any, ...optionalParams: any[]): void;
+  error(message: any, ...optionalParams: any[]): void;
 }
