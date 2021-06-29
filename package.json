@@ -32,7 +32,6 @@
     "fastify": "^3.18.1",
     "fastify-plugin": "^3.0.0",
     "fastify-websocket": "^3.2.0",
-    "graasp-types": "git+https://github.com/graasp/graasp-types.git#master",
     "ioredis": "^4.27.6"
   },
   "devDependencies": {

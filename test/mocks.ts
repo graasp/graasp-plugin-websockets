@@ -112,6 +112,7 @@ const mockItemService: ItemService = {
   getNumberOfLevelsToFarthestChild: jest.fn().mockReturnValue(0),
   getOwn: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
   getSharedWith: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
+  membersWithSharedItem: jest.fn().mockReturnValue(Promise.resolve(["mockMemberId"])),
   move: jest.fn(),
 };
 
