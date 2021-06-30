@@ -41,9 +41,15 @@ instance
 
 Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (e.g. `items`, `itemMemberships`, `taskRunner`, `validateSession`, ...)!
 
+If you'd like to access the properties that are decorated by the plugin (such as `websocketChannels` and `websocketChannelsBroker`) or ensure that the behaviour is registered on server boot and not asynchronously later, make sure to await the register call.
+
 ## API
 
 This plugin implements a custom protocol over WebSoket between clients and this server plugin to send real-time notifications for specific Graasp behaviours. Please read [`API.md`](API.md) for more information about the messages format used between the server and clients that subscribe to updates from `graasp-websockets`.
+
+## Adding behaviour with websockets
+
+If you want to **use real-time updates from the server** in front-end Graasp applications (e.g. `graasp-compose`) that require real-time feedback or **add additional real-time behaviour that is not implemented yet**, make sure to follow this guide: [USAGE.md](USAGE.md)
 
 ## Building locally
 
