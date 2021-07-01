@@ -10,6 +10,7 @@
 
 import { Item } from 'graasp';
 import {
+  BarOperation,
   ChildItemOperation,
   EntityName,
   ServerErrorName,
@@ -27,6 +28,7 @@ import {
   WS_SERVER_TYPE_INFO,
   WS_SERVER_TYPE_RESPONSE,
   WS_SERVER_TYPE_UPDATE,
+  WS_UPDATE_KIND_BAR,
   WS_UPDATE_KIND_CHILD_ITEM,
   WS_UPDATE_KIND_SHARED_WITH,
 } from './constants';
@@ -112,12 +114,20 @@ export interface ServerUpdate extends Message {
 /**
  * Update body type for Item channels
  */
-type ItemUpdateBody = ItemChildUpdateBody;
+type ItemUpdateBody = ItemChildUpdateBody
+  | ItemBarUpdateBody;
 
 interface ItemChildUpdateBody {
   entity: typeof WS_ENTITY_ITEM;
   kind: typeof WS_UPDATE_KIND_CHILD_ITEM;
   op: ChildItemOperation;
+  value: any; // should be Item, workaround for JTD schema
+}
+
+interface ItemBarUpdateBody {
+  entity: typeof WS_ENTITY_ITEM;
+  kind: typeof WS_UPDATE_KIND_BAR;
+  op: BarOperation;
   value: any; // should be Item, workaround for JTD schema
 }
 
@@ -192,12 +202,24 @@ const createServerUpdate = (
 
 export const createChildItemUpdate = (
   parentId: string,
-  op: ItemUpdateBody['op'],
+  op: ItemChildUpdateBody['op'],
   item: Item,
 ): ServerUpdate =>
   createServerUpdate(parentId, {
     entity: WS_ENTITY_ITEM,
     kind: WS_UPDATE_KIND_CHILD_ITEM,
+    op,
+    value: item,
+  });
+
+export const createBarUpdate = (
+  itemId: string,
+  op: ItemBarUpdateBody['op'],
+  item: Item,
+): ServerUpdate =>
+  createServerUpdate(itemId, {
+    entity: WS_ENTITY_ITEM,
+    kind: WS_UPDATE_KIND_BAR,
     op,
     value: item,
   });

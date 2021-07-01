@@ -6,6 +6,8 @@ A websockets extension for Graasp exposed through a fastify plugin
 
 This project provides back-end support for WebSockets in the Graasp ecosystem. It implements a Fastify plugin that can be registered into the core Graasp Fastify server instance.
 
+This plugin provides real-time communication across Graasp server clusters and all connected clients through a channel broadcast abstraction implemented on top of WebSocket. It provides real-time events sent to clients following a publish / subscribe pattern.
+
 ## Usage
 
 This plugin requires a [Redis](https://redis.io/) instance which serves as a relay when multiple instances of Graasp run as a cluster (for instance for load balancing purposes).
@@ -43,7 +45,7 @@ Services that are destructured from the Fastify instance in [`src/service-api.ts
 
 If you'd like to access the properties that are decorated by the plugin (such as `websocketChannels` and `websocketChannelsBroker`) or ensure that the behaviour is registered on server boot and not asynchronously later, make sure to await the register call.
 
-### Adding behaviour with websockets
+## Adding behaviour with websockets
 
 If you want to **use real-time updates from the server in front-end Graasp applications** (e.g. `graasp-compose`) that require real-time feedback or **add additional real-time behaviour that is not implemented yet**, make sure to follow this guide: [USAGE.md](USAGE.md)
 

@@ -53,13 +53,11 @@ export type ServerResponseStatus =
 
 export const WS_UPDATE_KIND_CHILD_ITEM = 'childItem';
 export const WS_UPDATE_KIND_SHARED_WITH = 'sharedWith';
-
-export type ServerUpdateKind =
-  | typeof WS_UPDATE_KIND_CHILD_ITEM
-  | typeof WS_UPDATE_KIND_SHARED_WITH;
+export const WS_UPDATE_KIND_BAR = 'bar';
 
 export const WS_UPDATE_OP_CREATE = 'create';
 export const WS_UPDATE_OP_DELETE = 'delete';
+export const WS_UPDATE_OP_FOO = 'foo';
 
 export type ChildItemOperation =
   | typeof WS_UPDATE_OP_CREATE
@@ -68,3 +66,8 @@ export type ChildItemOperation =
 export type SharedWithOperation =
   | typeof WS_UPDATE_OP_CREATE
   | typeof WS_UPDATE_OP_DELETE;
+
+export type BarOperation =
+  | typeof WS_UPDATE_OP_CREATE
+  | typeof WS_UPDATE_OP_DELETE
+  | typeof WS_UPDATE_OP_FOO;
