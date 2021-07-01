@@ -13,7 +13,6 @@
 import { JTDSchemaType } from 'ajv-latest/dist/core';
 import Ajv from 'ajv-latest/dist/jtd';
 import Redis from 'ioredis';
-import config from './config';
 import { WS_REALM_NOTIF } from './interfaces/constants';
 import { Logger } from './interfaces/logger';
 import { ClientMessage, ServerMessage } from './interfaces/message';
@@ -70,16 +69,10 @@ const redisSerdes = {
 
 // Helper to create a redis client instance
 function createRedisClientInstance(
-  redisConfig?: Redis.RedisOptions,
+  redisConfig: Redis.RedisOptions,
   log: Logger = console,
 ): Redis.Redis {
-  const redis = new Redis(
-    redisConfig || {
-      port: config.redis.port,
-      host: config.redis.host,
-      password: config.redis.password,
-    },
-  );
+  const redis = new Redis(redisConfig);
 
   redis.on('error', (err) => {
     log.error(
@@ -101,31 +94,37 @@ class MultiInstanceChannelsBroker {
   private readonly sub: Redis.Redis;
   // Redis client publisher instance
   private readonly pub: Redis.Redis;
+  // Notif channel name
+  private readonly notifChannel: string;
 
   constructor(
     wsChannels: WebSocketChannels<ClientMessage, ServerMessage>,
     log: Logger = console,
-    redisConfig?: Redis.RedisOptions,
+    redisParams: {
+      config: Redis.RedisOptions;
+      notifChannel: string;
+    },
   ) {
     this.wsChannels = wsChannels;
-    this.sub = createRedisClientInstance(redisConfig, log);
-    this.pub = createRedisClientInstance(redisConfig, log);
+    this.notifChannel = redisParams.notifChannel;
+    this.sub = createRedisClientInstance(redisParams.config, log);
+    this.pub = createRedisClientInstance(redisParams.config, log);
 
-    this.sub.subscribe(config.redis.notifChannel, (err, count) => {
+    this.sub.subscribe(this.notifChannel, (err, count) => {
       if (err) {
         log.error(
-          `graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${config.redis.notifChannel}, reason: ${err.message}`,
+          `graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${this.notifChannel}, reason: ${err.message}`,
         );
         log.error(`\t${err}`);
       }
     });
 
     this.sub.on('message', (channel, message) => {
-      if (channel === config.redis.notifChannel) {
+      if (channel === this.notifChannel) {
         const msg = redisSerdes.parse(message);
         if (msg === undefined) {
           log.info(
-            `graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${config.redis.notifChannel}": ${message}`,
+            `graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${this.notifChannel}": ${message}`,
           );
         } else {
           // forward notification to respective channel
@@ -147,7 +146,7 @@ class MultiInstanceChannelsBroker {
   dispatch(channel: string | 'broadcast', notif: ServerMessage): void {
     const msg = createRedisMessage(notif, channel);
     const json = redisSerdes.serialize(msg);
-    this.pub.publish(config.redis.notifChannel, json);
+    this.pub.publish(this.notifChannel, json);
   }
 
   /**

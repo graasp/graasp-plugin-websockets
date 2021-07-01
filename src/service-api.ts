@@ -13,6 +13,8 @@ import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { Item, ItemMembership } from 'graasp';
+import Redis from 'ioredis';
+import config from './config';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
 import {
   WS_CLIENT_ACTION_DISCONNECT,
@@ -55,7 +57,11 @@ declare module 'fastify' {
  * Type definition for plugin options
  */
 interface GraaspWebsocketsPluginOptions {
-  prefix: string;
+  prefix?: string;
+  redis?: {
+    config?: Redis.RedisOptions;
+    channelName?: string;
+  };
 }
 
 // Serializer / Deserializer instance
@@ -85,7 +91,15 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
   options,
 ) => {
   // destructure passed fastify instance
-  const prefix = options.prefix ? options.prefix : '/ws';
+  const prefix = options.prefix ?? '/ws';
+  const redis = {
+    config: {
+      port: options.redis?.config?.port ?? config.redis.port,
+      host: options.redis?.config?.host ?? config.redis.host,
+      password: options.redis?.config?.password ?? config.redis.password,
+    },
+    notifChannel: options.redis?.channelName ?? config.redis.notifChannel,
+  };
   const {
     items: { taskManager: itemTaskManager, dbService: itemDbService },
     itemMemberships: {
@@ -122,7 +136,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
   fastify.decorate('websocketChannels', wsChannels);
 
   // multi-instance handler
-  const channelsBroker = new MultiInstanceChannelsBroker(wsChannels, log);
+  const channelsBroker = new MultiInstanceChannelsBroker(
+    wsChannels,
+    log,
+    redis,
+  );
 
   // decorate main fastify instance with multi-instance websocket channels broker
   fastify.decorate('websocketChannelsBroker', channelsBroker);
@@ -310,17 +328,37 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
     }
   });
 
-  // on delete item, notify members
+  // on delete item, notify members BEFORE WITH PREHOOK
+  // (otherwise memberships already lost on cascade!)
+  runner.setTaskPreHookHandler<Item>(
+    deleteItemTaskName,
+    async ({ id }, actor, { handler }) => {
+      if (!id) {
+        return;
+      }
+      const item = await itemDbService.get(id, handler);
+      const memberIds = await itemDbService.membersWithSharedItem(
+        item.path,
+        handler,
+      );
+      memberIds.forEach((id) => {
+        channelsBroker.dispatch(
+          id,
+          createSharedWithUpdate(id, WS_UPDATE_OP_DELETE, item),
+        );
+      });
+    },
+  );
 
   // on item shared, notify members
   const createItemMembershipTaskName =
     itemMembershipTaskManager.getCreateTaskName();
   runner.setTaskPostHookHandler<ItemMembership>(
     createItemMembershipTaskName,
-    async (membership) => {
+    async (membership, actor, { handler }) => {
       const item = await itemDbService.get(
         extractChildId(membership.itemPath),
-        db.pool,
+        handler,
       );
       channelsBroker.dispatch(
         membership.memberId,
@@ -330,6 +368,25 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
   );
 
   // on membership deleted, notify members
+  const deleteItemMembershipTaskName =
+    itemMembershipTaskManager.getDeleteTaskName();
+  runner.setTaskPreHookHandler<ItemMembership>(
+    deleteItemMembershipTaskName,
+    async ({ id }, actor, { handler }) => {
+      if (!id) {
+        return;
+      }
+      const membership = await itemMembershipDbService.get(id, handler);
+      const item = await itemDbService.get(
+        extractChildId(membership.itemPath),
+        handler,
+      );
+      channelsBroker.dispatch(
+        membership.memberId,
+        createSharedWithUpdate(membership.memberId, WS_UPDATE_OP_DELETE, item),
+      );
+    },
+  );
 };
 
 export default fp(plugin, {
