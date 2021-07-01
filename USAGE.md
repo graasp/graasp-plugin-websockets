@@ -1,6 +1,6 @@
 # Adding real-time behaviour in Graasp front-end applications
 
-You may want to add real-time interactions with the Graasp core server in your front-end application. This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-websockets` plugin.
+You may want to add real-time interactions with the Graasp core server in your front-end application. This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-websockets` plugin. For server-side usage of the plugin, see [README.md](README.md).
 
 ## Exploring and using ready-to-use React hooks
 
