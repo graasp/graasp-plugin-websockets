@@ -130,7 +130,7 @@ interface MemberSharedWithUpdateBody {
   entity: typeof WS_ENTITY_MEMBER;
   kind: typeof WS_UPDATE_KIND_SHARED_WITH;
   op: SharedWithOperation;
-  value: any; // should be Item, workaround for JTD schem
+  value: any; // should be Item, workaround for JTD schema
 }
 
 /**
