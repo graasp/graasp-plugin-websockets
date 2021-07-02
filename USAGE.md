@@ -120,9 +120,9 @@ First define the semantics of your event by **editing [API.md#channels](API.md#c
 >        where
 >        - `<eventKind>` is:
 >            - `childItem` to represent updates of the children of the current item
-> +          - `bar` to represent the bar event
+> +          - `bar` to represent the bar event (describe it here)
 >        - `<operation>` is `create` or `delete`, applied to the `<opValue>` as a child of the current item.
-> +         If the event kind is `bar`, then `<operation>` can also be `foo` which performs the foo operation
+> +         If the event kind is `bar`, then `<operation>` can also be `foo` which performs the foo operation (describe it here)
 >        - `<opValue>` is the child item value
 >    - Notes:
 >        - The client must have at least read access to the item, otherwise an `ACCESS_DENIED` error response is sent>
@@ -143,9 +143,9 @@ You will most probably implement a change where you either:
   > + export const WS_UPDATE_OP_FOO = 'foo';
   >
   >   export type ChildItemOperation =
-  >   | typeof WS_UPDATE_OP_CREATE
-  >   | typeof WS_UPDATE_OP_DELETE
-  > + | typeof WS_UPDATE_OP_FOO;
+  >     | typeof WS_UPDATE_OP_CREATE
+  >     | typeof WS_UPDATE_OP_DELETE
+  > +   | typeof WS_UPDATE_OP_FOO;
   > ```
   >
   > The corresponding change in [`src/schemas/message-schema.ts`](src/schemas/message-schema.ts) is thus:
@@ -164,7 +164,7 @@ You will most probably implement a change where you either:
 
   > E.g. we want to add a new event kind called "bar" on the channel for items which can carry actions `create`, `delete` and `foo`.
   >
-  > Define the event kind string name, add the operation name as well as the operation union for this event kind in [`src/interfaces/constants.ts`](src/interfaces/>constants.ts):
+  > Define the event kind string name, add the operation name as well as the operation union for this event kind in [`src/interfaces/constants.ts`](src/interfaces/constants.ts):
   >
   > ```diff
   >   export const WS_UPDATE_KIND_CHILD_ITEM = 'childItem';
@@ -178,15 +178,15 @@ You will most probably implement a change where you either:
   > + export const WS_UPDATE_OP_FOO = 'foo';
   >
   >   export type ChildItemOperation =
-  >   | typeof WS_UPDATE_OP_CREATE
-  >   | typeof WS_UPDATE_OP_DELETE;
+  >     | typeof WS_UPDATE_OP_CREATE
+  >     | typeof WS_UPDATE_OP_DELETE;
   >
   >   ...
   >
   > + export type BarOperation =
-  > + | typeof WS_UPDATE_OP_CREATE
-  > + | typeof WS_UPDATE_OP_DELETE
-  > + | typeof WS_UPDATE_OP_FOO;
+  > +   | typeof WS_UPDATE_OP_CREATE
+  > +   | typeof WS_UPDATE_OP_DELETE
+  > +   | typeof WS_UPDATE_OP_FOO;
   > ```
   >
   > Then create a new interface for this event kind after the existing interfaces for this entity, and add it to the body union type of this entity in [`src/interfaces/message.ts`](src/interfaces/message.ts):
@@ -196,7 +196,7 @@ You will most probably implement a change where you either:
   >    * Update body type for Item channels
   >    */
   >   type ItemUpdateBody = ItemChildUpdateBody
-  > + | ItemBarUpdateBody;
+  > +   | ItemBarUpdateBody;
   >
   >   interface ItemChildUpdateBody {
   >     entity: typeof WS_ENTITY_ITEM;
@@ -266,10 +266,155 @@ You will most probably implement a change where you either:
 
 - **add an `entity` type**: when you want to add notifications for a new entity (for instance related to a different object in the database)
 
+  > E.g. we want to add notifications for an entity `Baz` which can emit events of kind `bar`, with operation `foo`.
+  >
+  > First define the associated constants in [`src/interfaces/constants.ts`](src/interfaces/constants.ts):
+  >
+  > ```diff
+  >   export const WS_ENTITY_ITEM = 'item';
+  >   export const WS_ENTITY_MEMBER = 'member';
+  > + export const WS_ENTITY_BAZ = 'baz';
+  >
+  >   export type EntityName =
+  >     | typeof WS_ENTITY_ITEM
+  >     | typeof WS_ENTITY_MEMBER
+  > +   | typeof WS_ENTITY_BAZ;
+  >
+  >   ...
+  >
+  >   export const WS_UPDATE_KIND_CHILD_ITEM = 'childItem';
+  >   export const WS_UPDATE_KIND_SHARED_WITH = 'sharedWith';
+  > + export const WS_UPDATE_KIND_BAR = 'bar';
+  >
+  >   export const WS_UPDATE_OP_CREATE = 'create';
+  >   export const WS_UPDATE_OP_DELETE = 'delete';
+  > + export const WS_UPDATE_OP_FOO = 'foo';
+  >
+  >   ...
+  >
+  > + export type BarOperation =
+  > +   | typeof WS_UPDATE_OP_FOO;
+  > ```
+  >
+  > In [`src/interfaces/message.ts`](src/interfaces/message.ts) create a new interface and a new type for the update body of this entity. Then add this type to the body union type of the `ServerUpdate` interface. Also add a factory method to create your event messages:
+  >
+  > ```diff
+  >   ...
+  >
+  >   export interface ServerUpdate extends Message {
+  >     type: typeof WS_SERVER_TYPE_UPDATE;
+  >     channel: string;
+  > -   body: ItemUpdateBody | MemberUpdateBody;
+  > +   body: ItemUpdateBody | MemberUpdateBody | BazUpdateBody;
+  >   }
+  >
+  >   ...
+  >
+  > + /**
+  > +  * Update body type for Baz channels
+  > +  */
+  > + type BazUpdateBody = BazBarUpdateBody;
+  > +
+  > + interface BazBarUpdateBody {
+  > +   entity: typeof WS_ENTITY_BAZ;
+  > +   kind: typeof WS_UPDATE_KIND_BAR;
+  > +   op: BarOperation;
+  > +   value: any; // should be Baz, workaround for JTD schema
+  > +  }
+  >
+  >   ...
+  >
+  > + export const createBarUpdate = (
+  > +   bazId: string,
+  > +   op: BazBarUpdateBody['op'],
+  > +   baz: Baz,
+  > + ): ServerUpdate =>
+  > +   createServerUpdate(bazId, {
+  > +     entity: WS_ENTITY_BAZ,
+  > +     kind: WS_UPDATE_KIND_BAR,
+  > +     op,
+  > +     value: baz,
+  > +   });
+  > ```
+  >
+  > Mimic these interface changes in the JTD schema at [`src/schemas/message-schema.ts`](src/schemas/message-schema.ts):
+  >
+  > ```diff
+  >   ...
+  >
+  >     body: {
+  >       discriminator: 'entity',
+  >       mapping: {
+  >         item: {
+  >           properties: {
+  >             kind: { enum: ['childItem'] },
+  >             op: { enum: ['create', 'delete'] },
+  >           },
+  >           optionalProperties: {
+  >             value: {},
+  >           },
+  >         },
+  >         member: {
+  >           properties: {
+  >             kind: { enum: ['sharedWith'] },
+  >             op: { enum: ['create', 'delete'] },
+  >           },
+  >           optionalProperties: {
+  >             value: {},
+  >           },
+  >         },
+  > +       baz: {
+  > +         properties: {
+  > +           kind: { enum: ['bar'] },
+  > +           op: { enum: ['foo'] },
+  > +         },
+  > +         optionalProperties: {
+  > +           value: {},
+  > +         },
+  > +       },
+  >       },
+  >     },
+  >   
+  >   ... 
+  > ```
+  >
+  > You will also need to modify the client-side messages, to allow subscriptions to this new entity. Since you already changed the `EntityName` constant export and `ClientSubscribe(Only)` is already typed against `EntityName`, you only need to change it in the [`src/schemas/message-schema.ts`](src/schemas/message-schema.ts):
+  >
+  > ```diff
+  >   ...
+  >
+  >   subscribe: {
+  >     properties: {
+  >       realm: { enum: ['notif'] },
+  >       channel: { type: 'string' },
+  > -     entity: { enum: ['item', 'member'] },
+  > +     entity: { enum: ['item', 'member', 'baz'] },
+  >     },
+  >   },
+  >   unsubscribe: {
+  >     properties: {
+  >       realm: { enum: ['notif'] },
+  >       channel: { type: 'string' },
+  >     },
+  >   },
+  >   subscribeOnly: {
+  >     properties: {
+  >       realm: { enum: ['notif'] },
+  >       channel: { type: 'string' },
+  > -     entity: { enum: ['item', 'member'] },
+  > +     entity: { enum: ['item', 'member', 'baz'] },
+  >     },
+  >   },
+  >
+  >   ...
+  > ```
+  >
 
-- **something else**:
+- **something else**: you will want to dive deeper into the codebase of `graasp-websockets` and customize the interfaces as well as the logic to your new API.
 
 ### 2. Registering the message trigger in `graasp-websockets`
+
+#### Channel access control
 
 ### 3. Client-side implementation and hooks in `graasp-query-client`
 
