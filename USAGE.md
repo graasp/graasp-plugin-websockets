@@ -623,4 +623,52 @@ If you destructure a new service on the Fastify instance, you need to mock it in
 
 ### 3. Client-side implementation and hooks in `graasp-query-client`
 
-## Implementing your own client for the Graasp Websocket protocol
+Once your back-end implementation is ready, you can write the client code to consume your update notifications. In this section, we describe how to write custom React hooks using the `graasp-query-client`.
+
+The repository implements a [custom WebSocket client](https://github.com/graasp/graasp-query-client/blob/main/src/ws/ws-client.ts), which takes care of communicating with the server plugin using the Graasp websocket protocol defined at [`API.md`](API.md). As long as your API changes did not modify the top-level `ServerMessage = ServerResponse | ServerInfo | ServerUpdate` types, then no changes are required in this file.
+
+To add your own hooks, modify the [`src/ws/hooks.ts`](https://github.com/graasp/graasp-query-client/blob/main/src/ws/hooks.ts) file.
+
+In this example, we allow components to subscribe to the `bar` event on a `baz` entity. `bazId` is provided by the consumer component (e.g. when accessing the view of this `baz` object instance).
+
+Your hook must use hook composition, and first call the `useEffect` hook with the list of dependencies as second parameter (i.e. the list of variables to watch for changes, triggering a re-render). This ensures that the subscription mechanism is synchronized with the caller component lifecycle.
+
+Make sure to instantiate the handler function at every call of your hook: it must be passed both as argument to `subscribe` and `unsubscribe` at cleanup, to ensure that the function equality always correctly holds. React guarantees that the cleanup function is called at every re-render / component unmount, which ensures that resources are properly released (the above client will optimize and minimize the actual (un)subscription calls).
+
+You also need to type-check the incoming data, which is the raw update sent by the server. This also ensures that you do not receive erroneous notifications.
+
+```ts
+useBarUpdates: (bazId: UUID) => {
+  useEffect(() => {
+    if (!bazId) {
+      return;
+    }
+
+    const channel: Channel = { name: userId, entity: WS_ENTITY_BAZ };
+
+    const handler = (data: ServerMessage) => {
+      if (
+        data.type === WS_SERVER_TYPE_UPDATE &&
+        data.body.kind === WS_UPDATE_KIND_BAR &&
+        data.body.entity === WS_UPDATE_BAZ
+      ) {
+         // here you can perform your specific front-end application action
+         // data.body.value is type checked as a Baz
+         // in this example, we mutate the baz value in the query client
+         if (data.body.op === WS_UPDATE_OP_FOO) {
+           const value = data.body.value
+           queryClient.setQueryData(buildBazKey(value.id), value);
+         }
+      }
+    };
+
+    websocketClient.subscribe(channel, handler);
+
+    return function cleanup() {
+      websocketClient.unsubscribe(channel, handler);
+    }
+  }, [bazId]);
+};
+```
+
+You can then refer to the first section of the document ([Exploring and using ready-to-use React hooks](USAGE.md#exploring-and-using-ready-to-use-react-hooks)) to call your new custom hook in your React components.
