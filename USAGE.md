@@ -82,6 +82,8 @@ That's it!
 
 The existing hooks may not provide the functionality required by your application. This section will describe how to extend the capabilities of the plugin as well as of the query client.
 
+If the API already provides the interface for your feature but there is no React hook to consume the data for your needs, you can skip to [step 3](USAGE.md#3-client-side-implementation-and-hooks-in-graasp-query-client) to implement an additional custom hook in the query client.
+
 ### 1. Designing and extending the API
 
 Make sure to read the Graasp websocket protocol specification at [API.md](API.md), which defines the messages exchanged between the server plugin and clients. If your desired event is already defined in the API, you can skip to step 2 and use the corresponding existing server message. Otherwise chances are that you need a new custom event message.
@@ -374,8 +376,8 @@ You will most probably implement a change where you either:
   > +       },
   >       },
   >     },
-  >   
-  >   ... 
+  >
+  >   ...
   > ```
   >
   > You will also need to modify the client-side messages, to allow subscriptions to this new entity. Since you already changed the `EntityName` constant export and `ClientSubscribe(Only)` is already typed against `EntityName`, you only need to change it in the [`src/schemas/message-schema.ts`](src/schemas/message-schema.ts):
@@ -408,13 +410,216 @@ You will most probably implement a change where you either:
   >
   >   ...
   > ```
-  >
 
 - **something else**: you will want to dive deeper into the codebase of `graasp-websockets` and customize the interfaces as well as the logic to your new API.
 
 ### 2. Registering the message trigger in `graasp-websockets`
 
+Once the API is modified, you can register the actual event in the plugin core and send a notification using the factory that you previously defined.
+
+You can access the server components through the destructured [Fastify](https://www.fastify.io/docs/latest/) instance and its [decorated properties](https://www.fastify.io/docs/v1.13.x/Decorators/). They must thus be registered beforehand in the core server instance.
+
+> For instance, let's assume that our `Baz` event requires a service that has been injected (prior to the registration of this plugin) on the baz property using a decorator, then you can retrieve the service as follows in [`src/service-api.ts`](src/service-api.ts):
+>
+> ```diff
+>   const {
+>     items: { taskManager: itemTaskManager, dbService: itemDbService },
+>     itemMemberships: {
+>       taskManager: itemMembershipTaskManager,
+>       dbService: itemMembershipDbService,
+>     },
+> +   baz: { service: bazService }
+>     taskRunner: runner,
+>     validateSession,
+>     db,
+>     log,
+>   } = fastify;
+> ```
+
+In the plugin body, add your event trigger logic and send out your notification. Use `channelsBroker.dispatch` if your notification should be sent across all server instances (even across an entire cluster) to be sent to all relevant clients. If your message should only be sent to the local clients that are connected to this specific server instance, use `wsChannels.channelSend`:
+
+> Example: the `bazService` provides a callback on the `bar` event, on which you need to send a `baz` object notification with some `foo` action ([`src/service-api.ts`](src/service-api.ts)):
+>
+> ```diff
+>   ...
+>
+>   // on create item, notify parent
+>   const createItemTaskName = itemTaskManager.getCreateTaskName();
+>   runner.setTaskPostHookHandler<Item>(createItemTaskName, async (item) => {
+>     const parentId = getParentId(item);
+>     if (parentId !== undefined) {
+>       channelsBroker.dispatch(
+>         parentId,
+>         createChildItemUpdate(parentId, WS_UPDATE_OP_CREATE, item),
+>       );
+>     }
+>   });
+>
+>   ... // other triggers
+>
+> + // on bar event, notify baz object
+> + bazService.onBar(async (bazId) => {
+> +   // you can have async calls in your trigger:
+> +   const baz = await bazService.get(bazId)
+> +   // then build and send out your notification
+> +   channelsBroker.dispatch(
+> +     bazId,
+> +     createBarUpdate(bazId, WS_UPDATE_OP_FOO, baz),
+> +   )
+> + })
+> ```
+
 #### Channel access control
+
+If you created a new channel family (for instance if you registered a new entity), or if you want to change the access control rules for a given channel, you will need to modify the `userCanUseChannel` method in [`src/service-api.ts`](src/service-api.ts). This section will explain how to reject specific subscription requests depending on the client performing the attempt and the requested channel name.
+
+By default, the server will accept subscriptions from clients to any valid channel (i.e. if the subscription message format conforms to the API). However, you probably want to restrict the access to your channels for security, performance and business logic reasons. For instance, `Item` channels can only be accessed by the user if they have a right to read, write or administrate it.
+
+> Example: in this example the bazService provides the `authenticate(member, bazId)` to check whether a user is allowed to access the baz object associated to this ID.
+>
+> ```diff
+>   async function userCanUseChannel(request, member): Promise<'ok' | Error> {
+>     // if channel entity is member and it is not the current user, deny access
+>     if (request.entity === WS_ENTITY_MEMBER && member.id !== request.channel) {
+>       return accessDeniedError(request.channel);
+>     }
+>     // if channel entity is item and user does not have permission, deny access
+>     else if (request.entity === WS_ENTITY_ITEM) {
+>       try {
+>         const item = await itemDbService.get(request.channel, db.pool);
+>         if (!item) {
+>           // item was not found
+>           return notFoundError(request.channel);
+>         }
+>         const allowed = await itemMembershipDbService.canRead(
+>           member.id,
+>           item,
+>           db.pool,
+>         );
+>         if (!allowed) {
+>           // user does not have permission
+>           return accessDeniedError(request.channel);
+>         }
+>       } catch (error) {
+>         log.error(`graasp-websockets: Unexpected server error: ${error}`);
+>         // database error
+>         return { name: WS_SERVER_ERROR_GENERIC, message: 'Database error' };
+>       }
+>     }
+> +   // if channel entity is baz and user does not have permission, deny access
+> +   else if (request.entity === WS_ENTITY_BAZ) {
+> +     try {
+> +       const allowed = await bazService.authenticate(member, request.channel);
+> +       if (!allowed) {
+> +         return accessDeniedError(request.channel);
+> +       }
+> +     } catch (error) {
+> +       log.error(`graasp-websockets: Unexpected server error: ${error}`);
+> +       // database error
+> +       return { name: WS_SERVER_ERROR_GENERIC, message: 'Database error' };
+> +     }
+> +   }
+>     return 'ok';
+>   }
+> ```
+
+#### Tests and mocks
+
+Don't forget to add tests for your new API in [`test/service-api.test.ts`](test/service-api.test.ts).
+
+If you destructure a new service on the Fastify instance, you need to mock it in [`test/mocks.ts`](test/mocks.ts) and inject it in your test server instantiation.
+
+> Example: writing a mock for the baz service and injecting it in test servers.
+>
+> In [`test/mocks.ts`](test/mocks.ts):
+>
+> ```ts
+> export const mockBaz = {
+>   service: {
+>     get: jest.fn().mockReturnValue(createPromise(createMockBaz)),
+>   },
+> };
+> ```
+>
+> In [`test/test-utils.ts`](test/test-utils.ts)
+>
+> ```diff
+>   async function createFastifyInstance(
+>     config: TestConfig,
+>     setupFn: (instance: FastifyInstance) => Promise<void> = (_) =>
+>       Promise.resolve(),
+>   ): Promise<FastifyInstance> {
+>     const promise = new Promise<FastifyInstance>((resolve, reject) => {
+>       const server = fastify(/*{ logger: true }*/);
+>
+>       server.items = mockItemsManager;
+>
+>       server.itemMemberships = mockItemMembershipsManager;
+>
+>       server.taskRunner = mockTaskRunner;
+>
+>       server.validateSession = mockValidateSession;
+>       server.addHook('preHandler', mockSessionPreHandler);
+>
+>       server.db = mockDatabase;
+>
+> +     server.baz = mockBaz;
+>
+>       setupFn(server).then(() => {
+>         server.listen(config.port, config.host, (err, addr) => {
+>           if (err) {
+>             reject(err.message);
+>           }
+>           resolve(server);
+>         });
+>       });
+>     });
+> ```
+
+> Example: adding a test for the bar event on baz channel
+>
+> ```ts
+> test('Bar event triggers notification on baz channel', async () => {
+>   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+>   const server = await createWsFastifyInstance(config);
+>   const client = await createWsClient(config);
+>
+>   const ack = clientWait(client, 1);
+>   const req: ClientMessage = {
+>     realm: WS_REALM_NOTIF,
+>     action: WS_CLIENT_ACTION_SUBSCRIBE,
+>     channel: 'mockBazId',
+>     entity: WS_ENTITY_BAZ,
+>   };
+>   clientSend(client, req);
+>   expect(await ack).toStrictEqual({
+>     realm: WS_REALM_NOTIF,
+>     type: WS_SERVER_TYPE_RESPONSE,
+>     status: WS_RESPONSE_STATUS_SUCCESS,
+>     request: req,
+>   });
+>
+>   // expect next message to be parent notif
+>   const notif = clientWait(client, 1);
+>   // simulate bar event
+>   const mockBaz: Baz = createMockBaz();
+>   (mockBaz.service.get as jest.Mock).mockReturnValueOnce(mockBaz);
+>   expect(await notif).toStrictEqual({
+>     realm: WS_REALM_NOTIF,
+>     type: WS_SERVER_TYPE_UPDATE,
+>     channel: 'mockBazId',
+>     body: {
+>       entity: WS_ENTITY_BAZ,
+>       kind: WS_UPDATE_KIND_BAR,
+>       op: WS_UPDATE_OP_FOO,
+>       value: mockBaz,
+>     },
+>   });
+>
+>   client.close();
+>   server.close();
+> });
+> ```
 
 ### 3. Client-side implementation and hooks in `graasp-query-client`
 
