@@ -94,6 +94,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
   const prefix = options.prefix ?? '/ws';
   const redis = {
     config: {
+      ...options.redis,
       port: options.redis?.config?.port ?? config.redis.port,
       host: options.redis?.config?.host ?? config.redis.host,
       password: options.redis?.config?.password ?? config.redis.password,
@@ -328,6 +329,10 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
     }
   });
 
+  // TODO: on delete item, notify item itself
+
+  // TODO: on delete item, notify creator if they are admin
+
   // on delete item, notify members BEFORE WITH PREHOOK
   // (otherwise memberships already lost on cascade!)
   runner.setTaskPreHookHandler<Item>(
@@ -349,6 +354,8 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
       });
     },
   );
+
+  // TODO: on copy, if destination has parent notify
 
   // on item shared, notify members
   const createItemMembershipTaskName =
@@ -387,12 +394,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
       );
     },
   );
+
+  log.info(`graasp-websockets: plugin booted with prefix ${prefix} and Redis config ${JSON.stringify(redis)}`);
 };
 
 export default fp(plugin, {
   fastify: '3.x',
   name: 'graasp-websockets',
 });
-
-export * from './interfaces/constants';
-export * from './interfaces/message';
