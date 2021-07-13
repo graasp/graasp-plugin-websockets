@@ -7,6 +7,7 @@
  */
 
 import fastify, { FastifyInstance } from 'fastify';
+import Redis from 'ioredis';
 import WebSocket from 'ws';
 import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
@@ -34,6 +35,10 @@ interface TestConfig {
   host: string;
   port: number;
   prefix?: string;
+  redis?: {
+    config?: Redis.RedisOptions;
+    channelName?: string;
+  };
 }
 
 /**
@@ -153,7 +158,7 @@ async function createWsFastifyInstance(
     await setupFn(instance);
     await instance.register(
       graaspWebSockets,
-      config.prefix ? { prefix: config.prefix } : undefined,
+      config,
     );
   });
 }

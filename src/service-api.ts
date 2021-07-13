@@ -14,6 +14,7 @@ import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { Item, ItemMembership } from 'graasp';
 import Redis from 'ioredis';
+import util from 'util';
 import config from './config';
 import { AjvMessageSerializer } from './impls/ajv-message-serializer';
 import {
@@ -94,7 +95,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
   const prefix = options.prefix ?? '/ws';
   const redis = {
     config: {
-      ...options.redis,
+      ...options.redis?.config,
       port: options.redis?.config?.port ?? config.redis.port,
       host: options.redis?.config?.host ?? config.redis.host,
       password: options.redis?.config?.password ?? config.redis.password,
@@ -355,7 +356,17 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
     },
   );
 
-  // TODO: on copy, if destination has parent notify
+  // on copy, if destination has parent notify
+  const copyItemTaskName = itemTaskManager.getCopyTaskName();
+  runner.setTaskPostHookHandler<Item>(copyItemTaskName, async (item) => {
+    const parentId = getParentId(item);
+    if (parentId !== undefined) {
+      channelsBroker.dispatch(
+        parentId,
+        createChildItemUpdate(parentId, WS_UPDATE_OP_CREATE, item),
+      );
+    }
+  });
 
   // on item shared, notify members
   const createItemMembershipTaskName =
@@ -395,7 +406,15 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
     },
   );
 
-  log.info(`graasp-websockets: plugin booted with prefix ${prefix} and Redis config ${JSON.stringify(redis)}`);
+  const publicRedisConfig = { ...redis };
+  delete publicRedisConfig.config.password;
+
+  log.info(
+    `graasp-websockets: plugin booted with prefix ${prefix} and Redis parameters ${util.inspect(
+      publicRedisConfig,
+      { breakLength: Infinity },
+    )}`,
+  );
 };
 
 export default fp(plugin, {

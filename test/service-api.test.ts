@@ -64,6 +64,38 @@ afterEach(() => {
 });
 
 describe('Plugin state and interfaces', () => {
+  test('Plugin logs correctly on boot', async () => {
+    const config: TestConfig = {
+      host: '127.0.0.1',
+      port: portGen.getNewPort(),
+      prefix: '/some-prefix',
+      redis: {
+        config: {
+          host: '127.0.0.1',
+          port: 6379,
+          username: 'redis-user',
+          password: 'redis-password',
+        },
+        channelName: 'redis-channel-name',
+      },
+    };
+
+    const spiedLogger: FastifyLoggerInstance = createMockFastifyLogger();
+    const logInfoSpy = jest.spyOn(spiedLogger, 'info');
+    const server = await createWsFastifyInstance(config, async (instance) => {
+      instance.log = spiedLogger;
+    });
+
+    await waitForExpect(() => {
+      // password should not be logged
+      expect(logInfoSpy).toHaveBeenCalledWith(
+        "graasp-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'redis-user' }, notifChannel: 'redis-channel-name' }",
+      );
+    });
+
+    server.close();
+  });
+
   test('Prefix option is used if present, otherwise default is used', async () => {
     const configWithPrefix: TestConfig = {
       host: '127.0.0.1',
@@ -1133,7 +1165,7 @@ describe('Erroneous cases are handled', () => {
 
     // setup logger with spy on error output, inject it into server
     const spiedLogger: FastifyLoggerInstance = createMockFastifyLogger();
-    const logErrorSpy = jest.spyOn(spiedLogger, WS_RESPONSE_STATUS_ERROR);
+    const logErrorSpy = jest.spyOn(spiedLogger, 'error');
     const server = await createWsFastifyInstance(config, async (instance) => {
       instance.log = spiedLogger;
 
