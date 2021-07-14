@@ -73,7 +73,7 @@ describe('Plugin state and interfaces', () => {
         config: {
           host: '127.0.0.1',
           port: 6379,
-          username: 'redis-user',
+          username: 'default',
           password: 'redis-password',
         },
         channelName: 'redis-channel-name',
@@ -89,7 +89,7 @@ describe('Plugin state and interfaces', () => {
     await waitForExpect(() => {
       // password should not be logged
       expect(logInfoSpy).toHaveBeenCalledWith(
-        "graasp-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'redis-user' }, notifChannel: 'redis-channel-name' }",
+        "graasp-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'default' }, notifChannel: 'redis-channel-name' }",
       );
     });
 
