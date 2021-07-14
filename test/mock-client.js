@@ -2,7 +2,8 @@
  * Mock WebSocket class for Graasp WS protocol
  */
 
-// eslint-disable-next-line import/prefer-default-export
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+
 export class WebSocket {
   constructor() {
     this.CLOSED = 0;
