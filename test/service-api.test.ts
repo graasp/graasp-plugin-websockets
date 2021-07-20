@@ -11,6 +11,7 @@
 
 import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import { Item, ItemMembership } from 'graasp';
+import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import {
@@ -18,6 +19,7 @@ import {
   WS_CLIENT_ACTION_SUBSCRIBE,
   WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
   WS_CLIENT_ACTION_UNSUBSCRIBE,
+  WS_ENTITY_CHAT,
   WS_ENTITY_ITEM,
   WS_ENTITY_MEMBER,
   WS_REALM_NOTIF,
@@ -30,16 +32,20 @@ import {
   WS_SERVER_TYPE_INFO,
   WS_SERVER_TYPE_RESPONSE,
   WS_SERVER_TYPE_UPDATE,
+  WS_UPDATE_KIND_CHAT_ITEM,
   WS_UPDATE_KIND_CHILD_ITEM,
   WS_UPDATE_KIND_SHARED_WITH,
   WS_UPDATE_OP_CREATE,
   WS_UPDATE_OP_DELETE,
+  WS_UPDATE_OP_PUBLISH,
 } from '../src/interfaces/constants';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
 import {
+  createMockChatMessage,
   createMockFastifyLogger,
   createMockItem,
   createMockItemMembership,
+  mockChatManager,
   mockItemMembershipsManager,
   mockItemsManager,
   mockTaskRunner,
@@ -738,6 +744,52 @@ describe('Graasp-specific behaviour', () => {
     server.close();
   });
 
+  test('Copying an item triggers notification on destination parent channel', async () => {
+    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+    const server = await createWsFastifyInstance(config);
+    const client = await createWsClient(config);
+
+    const ack = clientWait(client, 1);
+    const req: ClientMessage = {
+      realm: WS_REALM_NOTIF,
+      action: WS_CLIENT_ACTION_SUBSCRIBE,
+      channel: 'parent',
+      entity: WS_ENTITY_ITEM,
+    };
+    clientSend(client, req);
+    expect(await ack).toStrictEqual({
+      realm: WS_REALM_NOTIF,
+      type: WS_SERVER_TYPE_RESPONSE,
+      status: WS_RESPONSE_STATUS_SUCCESS,
+      request: req,
+    });
+
+    // expect next message to be parent notif
+    const notif = clientWait(client, 1);
+    // simulate copy into child event on task runner
+    const copiedChildItem: Item = createMockItem();
+    copiedChildItem.path = 'parent.child';
+    copiedChildItem.extra = { foo: 'bar' };
+    await mockTaskRunner.runPost(
+      mockItemsManager.taskManager.getCopyTaskName(),
+      copiedChildItem,
+    );
+    expect(await notif).toStrictEqual({
+      realm: WS_REALM_NOTIF,
+      type: WS_SERVER_TYPE_UPDATE,
+      channel: 'parent',
+      body: {
+        entity: WS_ENTITY_ITEM,
+        kind: WS_UPDATE_KIND_CHILD_ITEM,
+        op: WS_UPDATE_OP_CREATE,
+        value: copiedChildItem,
+      },
+    });
+
+    client.close();
+    server.close();
+  });
+
   test('Deleting an item triggers notification on all members that have memberships on it', async () => {
     const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
     const server = await createWsFastifyInstance(config);
@@ -883,6 +935,51 @@ describe('Graasp-specific behaviour', () => {
     client.close();
     server.close();
   });
+});
+
+test('Publishing a new message triggers notification on chat channel', async () => {
+  const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+  const server = await createWsFastifyInstance(config);
+  const client = await createWsClient(config);
+
+  const ack = clientWait(client, 1);
+  const req: ClientMessage = {
+    realm: WS_REALM_NOTIF,
+    action: WS_CLIENT_ACTION_SUBSCRIBE,
+    channel: 'mockChatId',
+    entity: WS_ENTITY_CHAT,
+  };
+  clientSend(client, req);
+  expect(await ack).toStrictEqual({
+    realm: WS_REALM_NOTIF,
+    type: WS_SERVER_TYPE_RESPONSE,
+    status: WS_RESPONSE_STATUS_SUCCESS,
+    request: req,
+  });
+
+  // expect next message to be chat notif
+  const notif = clientWait(client, 1);
+  // simulate publish message on task runner
+  const mockMessage: ChatMessage = createMockChatMessage();
+  await mockTaskRunner.runPost(
+    mockChatManager.taskManager.getPublishMessageTaskName(),
+    mockMessage,
+  );
+  // expected object is mock message
+  expect(await notif).toStrictEqual({
+    realm: WS_REALM_NOTIF,
+    type: WS_SERVER_TYPE_UPDATE,
+    channel: 'mockChatId',
+    body: {
+      entity: WS_ENTITY_CHAT,
+      kind: WS_UPDATE_KIND_CHAT_ITEM,
+      op: WS_UPDATE_OP_PUBLISH,
+      value: mockMessage,
+    },
+  });
+
+  client.close();
+  server.close();
 });
 
 describe('Erroneous cases are handled', () => {
