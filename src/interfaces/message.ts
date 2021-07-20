@@ -101,7 +101,7 @@ export interface ServerResponse extends Message {
 export interface ServerInfo extends Message {
   type: typeof WS_SERVER_TYPE_INFO;
   message: string;
-  extra?: any;
+  extra?: unknown;
 }
 
 /**
@@ -122,7 +122,7 @@ interface ItemChildUpdateBody {
   entity: typeof WS_ENTITY_ITEM;
   kind: typeof WS_UPDATE_KIND_CHILD_ITEM;
   op: ChildItemOperation;
-  value: any; // should be Item, workaround for JTD schema
+  value: unknown; // should be Item, workaround for JTD schema
 }
 
 /**
@@ -134,7 +134,7 @@ interface MemberSharedWithUpdateBody {
   entity: typeof WS_ENTITY_MEMBER;
   kind: typeof WS_UPDATE_KIND_SHARED_WITH;
   op: SharedWithOperation;
-  value: any; // should be Item, workaround for JTD schema
+  value: unknown; // should be Item, workaround for JTD schema
 }
 
 /**
@@ -146,7 +146,7 @@ interface ItemChatUpdateBody {
   entity: typeof WS_ENTITY_CHAT;
   kind: typeof WS_UPDATE_KIND_CHAT_ITEM;
   op: ItemChatOperation;
-  value: any; // should be ChatMessage, workaround for JTD schema
+  value: unknown; // should be ChatMessage, workaround for JTD schema
 }
 
 /**
@@ -189,7 +189,10 @@ export const createServerSuccessResponse = (
 ): ServerResponse =>
   createServerResponse(WS_RESPONSE_STATUS_SUCCESS, undefined, request);
 
-export const createServerInfo = (message: string, extra?: any): ServerInfo => ({
+export const createServerInfo = (
+  message: string,
+  extra?: unknown,
+): ServerInfo => ({
   realm: WS_REALM_NOTIF,
   type: WS_SERVER_TYPE_INFO,
   message,
