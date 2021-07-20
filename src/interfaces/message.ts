@@ -9,9 +9,11 @@
  */
 
 import { Item } from 'graasp';
+import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import {
   ChildItemOperation,
   EntityName,
+  ItemChatOperation,
   ServerErrorName,
   ServerResponseStatus,
   SharedWithOperation,
@@ -19,6 +21,7 @@ import {
   WS_CLIENT_ACTION_SUBSCRIBE,
   WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
   WS_CLIENT_ACTION_UNSUBSCRIBE,
+  WS_ENTITY_CHAT,
   WS_ENTITY_ITEM,
   WS_ENTITY_MEMBER,
   WS_REALM_NOTIF,
@@ -27,6 +30,7 @@ import {
   WS_SERVER_TYPE_INFO,
   WS_SERVER_TYPE_RESPONSE,
   WS_SERVER_TYPE_UPDATE,
+  WS_UPDATE_KIND_CHAT_ITEM,
   WS_UPDATE_KIND_CHILD_ITEM,
   WS_UPDATE_KIND_SHARED_WITH,
 } from './constants';
@@ -106,7 +110,7 @@ export interface ServerInfo extends Message {
 export interface ServerUpdate extends Message {
   type: typeof WS_SERVER_TYPE_UPDATE;
   channel: string;
-  body: ItemUpdateBody | MemberUpdateBody;
+  body: ItemUpdateBody | MemberUpdateBody | ChatUpdateBody;
 }
 
 /**
@@ -131,6 +135,18 @@ interface MemberSharedWithUpdateBody {
   kind: typeof WS_UPDATE_KIND_SHARED_WITH;
   op: SharedWithOperation;
   value: any; // should be Item, workaround for JTD schema
+}
+
+/**
+ * Update body type for Chat channels
+ */
+type ChatUpdateBody = ItemChatUpdateBody;
+
+interface ItemChatUpdateBody {
+  entity: typeof WS_ENTITY_CHAT;
+  kind: typeof WS_UPDATE_KIND_CHAT_ITEM;
+  op: ItemChatOperation;
+  value: any; // should be ChatMessage, workaround for JTD schema
 }
 
 /**
@@ -212,4 +228,16 @@ export const createSharedWithUpdate = (
     kind: WS_UPDATE_KIND_SHARED_WITH,
     op,
     value: sharedItem,
+  });
+
+export const createItemChatUpdate = (
+  chatId: string,
+  op: ItemChatUpdateBody['op'],
+  message: ChatMessage,
+): ServerUpdate =>
+  createServerUpdate(chatId, {
+    entity: WS_ENTITY_CHAT,
+    kind: WS_UPDATE_KIND_CHAT_ITEM,
+    op,
+    value: message,
   });

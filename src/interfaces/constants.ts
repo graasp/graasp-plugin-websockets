@@ -10,8 +10,12 @@ export const WS_REALM_NOTIF = 'notif';
 
 export const WS_ENTITY_ITEM = 'item';
 export const WS_ENTITY_MEMBER = 'member';
+export const WS_ENTITY_CHAT = 'chat';
 
-export type EntityName = typeof WS_ENTITY_ITEM | typeof WS_ENTITY_MEMBER;
+export type EntityName =
+  | typeof WS_ENTITY_ITEM
+  | typeof WS_ENTITY_MEMBER
+  | typeof WS_ENTITY_CHAT;
 
 export const WS_CLIENT_ACTION_SUBSCRIBE = 'subscribe';
 export const WS_CLIENT_ACTION_UNSUBSCRIBE = 'unsubscribe';
@@ -53,9 +57,11 @@ export type ServerResponseStatus =
 
 export const WS_UPDATE_KIND_CHILD_ITEM = 'childItem';
 export const WS_UPDATE_KIND_SHARED_WITH = 'sharedWith';
+export const WS_UPDATE_KIND_CHAT_ITEM = 'itemChat';
 
 export const WS_UPDATE_OP_CREATE = 'create';
 export const WS_UPDATE_OP_DELETE = 'delete';
+export const WS_UPDATE_OP_PUBLISH = 'publish';
 
 export type ChildItemOperation =
   | typeof WS_UPDATE_OP_CREATE
@@ -64,3 +70,5 @@ export type ChildItemOperation =
 export type SharedWithOperation =
   | typeof WS_UPDATE_OP_CREATE
   | typeof WS_UPDATE_OP_DELETE;
+
+export type ItemChatOperation = typeof WS_UPDATE_OP_PUBLISH;

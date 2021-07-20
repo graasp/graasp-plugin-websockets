@@ -15,6 +15,7 @@ import { MessageSerializer } from '../src/interfaces/message-serializer';
 import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
 import {
+  mockChatManager,
   mockDatabase,
   mockItemMembershipsManager,
   mockItemsManager,
@@ -129,6 +130,8 @@ async function createFastifyInstance(
 
     server.db = mockDatabase;
 
+    server.chat = mockChatManager;
+
     setupFn(server).then(() => {
       server.listen(config.port, config.host, (err, addr) => {
         if (err) {
@@ -156,10 +159,7 @@ async function createWsFastifyInstance(
     // plugin must be registered inside this function parameter as it cannot be
     // added after the instance has already booted
     await setupFn(instance);
-    await instance.register(
-      graaspWebSockets,
-      config,
-    );
+    await instance.register(graaspWebSockets, config);
   });
 }
 

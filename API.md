@@ -29,7 +29,7 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
         "entity": "<entityType>",
     }
     ```
-    where `<channelName>` is the name of the channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item` or `member`).
+    where `<channelName>` is the name of the channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item`, `chat` or `member`).
 
 - Client unsubscribe: unsubscribe the WS client from the specified channel:
     ```jsonc
@@ -50,7 +50,7 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
         "entity": "<entityType>",
     }
     ```
-    where `<channelName>` is the name of the only channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item` or `member`).
+    where `<channelName>` is the name of the only channel to subscribe to and `<entityType>` the kind of channel to subscribe to (`item`, `chat` or `member`).
 
 - Client disconnect: unsubscribes the WS client from all channels it is currently subscribed to and unregisters the WS client from `graasp-websockets`:
     ```jsonc
@@ -156,10 +156,34 @@ In the following code snippets, strings between angle brackets (`"<example>"`) a
         where
         - `<eventKind>` is:
             - `sharedWith` to represent updates of the items which membership is shared with the current user
-            - `<operation>` is `create` or `delete`, applied to the `<opValue>` as an item which membership applies to the current user
-            - `<opValue>` is the shared item value
+        - `<operation>` is `create` or `delete`, applied to the `<opValue>` as an item which membership applies to the current user
+        - `<opValue>` is the shared item value
         - Notes:
             - The client can only subscribe to its own channel (i.e. the ID of the user session must resolve to the same ID as the channel name). Otherwise, an `ACCESS_DENIED` error response is sent
+
+- `Chat` channel (from the [Chat](https://github.com/graasp/graasp-plugin-chatbox/blob/main/src/interfaces/chat.ts) Graasp type)
+    - Channel name: ID of the chat (= value of `chat.id`) to observe
+    - Update message type:
+        ```jsonc
+        {
+            "realm": "notif",
+            "type": "update",
+            "channel": "<chatId>",
+            "body": {
+                "entity": "chat",
+                "kind": "<eventKind>",
+                "op": "<operation>",
+                "value": "<opValue>",
+            }
+        }
+        ```
+        where
+        - `<eventKind>` is:
+            - `itemChat` to represent updates of an item chat
+        - `<operation>` is `publish` when a new message is published in this chat
+        - `<opValue>` is the chat message value
+        - Notes:
+            - The client can only subscribe to item chats to which they have at least read access, otherwise an `ACCESS_DENIED` error response is sent
 
 ### Server-specific rules
 

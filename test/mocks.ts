@@ -22,6 +22,10 @@ import {
   TaskHookHandlerHelpers,
   TaskRunner,
 } from 'graasp';
+import { ChatService } from 'graasp-plugin-chatbox/dist/db-service';
+import { Chat } from 'graasp-plugin-chatbox/dist/interfaces/chat';
+import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
+import { ChatTaskManager } from 'graasp-plugin-chatbox/dist/interfaces/chat-task-manager';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
@@ -112,7 +116,9 @@ const mockItemService: ItemService = {
   getNumberOfLevelsToFarthestChild: jest.fn().mockReturnValue(0),
   getOwn: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
   getSharedWith: jest.fn().mockReturnValue(createPromise(createMockItemArray)),
-  membersWithSharedItem: jest.fn().mockReturnValue(Promise.resolve(["mockMemberId"])),
+  membersWithSharedItem: jest
+    .fn()
+    .mockReturnValue(Promise.resolve(['mockMemberId'])),
   move: jest.fn(),
 };
 
@@ -186,6 +192,36 @@ const mockItemMembershipService: ItemMembershipService = {
   ...({} as any),
 };
 
+export const createMockChatMessage = (): ChatMessage => ({
+  chatId: 'mockChatId',
+  creator: 'mockChatCreator',
+  createdAt: 'mockChatCreatedAt',
+  body: 'mockMessageBody',
+});
+
+export const createMockChat = (): Chat => ({
+  id: 'mockChatId',
+  messages: [createMockChatMessage()],
+});
+
+const mockChatTaskManager: ChatTaskManager = {
+  getGetChatTaskname: () => 'chatGet',
+  getPublishMessageTaskName: () => 'chatPublishMessage',
+  createGetTask: jest
+    .fn()
+    .mockReturnValue(createMockTask(createMockActor, createMockChat)),
+  createPublishMessageTask: jest
+    .fn()
+    .mockReturnValue(createMockTask(createMockActor, createMockChatMessage)),
+};
+
+const mockChatService: ChatService = {
+  get: jest.fn().mockReturnValue(createPromise(createMockChat)),
+  publishMessage: jest
+    .fn()
+    .mockReturnValue(createPromise(createMockChatMessage)),
+};
+
 export const mockItemsManager = {
   taskManager: mockItemTaskManager,
   dbService: mockItemService,
@@ -196,6 +232,11 @@ export const mockItemsManager = {
 export const mockItemMembershipsManager = {
   taskManager: mockItemMembershipTaskManager,
   dbService: mockItemMembershipService,
+};
+
+export const mockChatManager = {
+  taskManager: mockChatTaskManager,
+  dbService: mockChatService,
 };
 
 // mock task runner storage for handlers

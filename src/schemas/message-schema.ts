@@ -27,7 +27,7 @@ const clientMessageSchema: JTDSchemaType<ClientMessage> = {
       properties: {
         realm: { enum: ['notif'] },
         channel: { type: 'string' },
-        entity: { enum: ['item', 'member'] },
+        entity: { enum: ['item', 'member', 'chat'] },
       },
     },
     unsubscribe: {
@@ -40,7 +40,7 @@ const clientMessageSchema: JTDSchemaType<ClientMessage> = {
       properties: {
         realm: { enum: ['notif'] },
         channel: { type: 'string' },
-        entity: { enum: ['item', 'member'] },
+        entity: { enum: ['item', 'member', 'chat'] },
       },
     },
   },
@@ -97,6 +97,15 @@ const serverMessageSchema: JTDSchemaType<ServerMessage> = {
               properties: {
                 kind: { enum: ['sharedWith'] },
                 op: { enum: ['create', 'delete'] },
+              },
+              optionalProperties: {
+                value: {},
+              },
+            },
+            chat: {
+              properties: {
+                kind: { enum: ['itemChat'] },
+                op: { enum: ['publish'] },
               },
               optionalProperties: {
                 value: {},

@@ -13,6 +13,7 @@ import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { Item, ItemMembership } from 'graasp';
+import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import Redis from 'ioredis';
 import util from 'util';
 import config from './config';
@@ -22,6 +23,7 @@ import {
   WS_CLIENT_ACTION_SUBSCRIBE,
   WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
   WS_CLIENT_ACTION_UNSUBSCRIBE,
+  WS_ENTITY_CHAT,
   WS_ENTITY_ITEM,
   WS_ENTITY_MEMBER,
   WS_SERVER_ERROR_ACCESS_DENIED,
@@ -30,10 +32,12 @@ import {
   WS_SERVER_ERROR_NOT_FOUND,
   WS_UPDATE_OP_CREATE,
   WS_UPDATE_OP_DELETE,
+  WS_UPDATE_OP_PUBLISH,
 } from './interfaces/constants';
 import {
   ClientMessage,
   createChildItemUpdate,
+  createItemChatUpdate,
   createServerErrorResponse,
   createServerSuccessResponse,
   createSharedWithUpdate,
@@ -108,6 +112,7 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
       taskManager: itemMembershipTaskManager,
       dbService: itemMembershipDbService,
     },
+    chat: { taskManager: chatTaskManager },
     taskRunner: runner,
     validateSession,
     db,
@@ -163,7 +168,11 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
       return accessDeniedError(request.channel);
     }
     // if channel entity is item and user does not have permission, deny access
-    else if (request.entity === WS_ENTITY_ITEM) {
+    // if channel is chat and user does not have access to chat, deny access
+    else if (
+      request.entity === WS_ENTITY_ITEM ||
+      request.entity === WS_ENTITY_CHAT
+    ) {
       try {
         const item = await itemDbService.get(request.channel, db.pool);
         if (!item) {
@@ -402,6 +411,19 @@ const plugin: FastifyPluginAsync<GraaspWebsocketsPluginOptions> = async (
       channelsBroker.dispatch(
         membership.memberId,
         createSharedWithUpdate(membership.memberId, WS_UPDATE_OP_DELETE, item),
+      );
+    },
+  );
+
+  // on new chat message, broadcast to item chat channel
+  const publishMessageChatTaskName =
+    chatTaskManager.getPublishMessageTaskName();
+  runner.setTaskPostHookHandler<ChatMessage>(
+    publishMessageChatTaskName,
+    (message) => {
+      channelsBroker.dispatch(
+        message.chatId,
+        createItemChatUpdate(message.chatId, WS_UPDATE_OP_PUBLISH, message),
       );
     },
   );
