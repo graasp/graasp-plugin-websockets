@@ -157,6 +157,9 @@ const mockItemMembershipTaskManager: ItemMembershipTaskManager = {
     .mockReturnValue(
       createMockTask(createMockActor, createMockItemMembershipArray),
     ),
+  createDeleteAllOnAndBelowItemTask: jest
+    .fn()
+    .mockReturnValue(createMockTask(createMockActor, createMockItemMembership)),
 };
 
 const mockItemMembershipService: ItemMembershipService = {
