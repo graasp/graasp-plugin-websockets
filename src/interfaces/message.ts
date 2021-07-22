@@ -8,8 +8,8 @@
  * @author Alexandre CHAU
  */
 
+import { ChatMessage } from '@graasp/chatbox';
 import { Item } from 'graasp';
-import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import {
   ChildItemOperation,
   EntityName,

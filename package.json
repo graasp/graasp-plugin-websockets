@@ -35,7 +35,7 @@
     "ioredis": "^4.27.6"
   },
   "devDependencies": {
-    "@types/graasp-plugin-chatbox": "git://github.com/graasp/graasp-plugin-chatbox.git",
+    "@graasp/chatbox": "git://github.com/graasp/graasp-plugin-chatbox.git",
     "@types/graasp": "git://github.com/graasp/graasp-types.git",
     "@types/ioredis": "^4.26.4",
     "@types/jest": "^26.0.23",

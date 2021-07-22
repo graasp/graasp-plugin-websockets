@@ -9,11 +9,11 @@
  * @author Alexandre CHAU
  */
 
+import { ChatMessage, ChatService, ChatTaskManager } from '@graasp/chatbox';
 import { FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
 import { Item, ItemMembership } from 'graasp';
-import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import Redis from 'ioredis';
 import util from 'util';
 import config from './config';
@@ -53,6 +53,7 @@ import { WebSocketChannels } from './ws-channels';
  */
 declare module 'fastify' {
   interface FastifyInstance {
+    chat: { dbService: ChatService; taskManager: ChatTaskManager };
     websocketChannels?: WebSocketChannels<ClientMessage, ServerMessage>;
     websocketChannelsBroker?: MultiInstanceChannelsBroker;
   }

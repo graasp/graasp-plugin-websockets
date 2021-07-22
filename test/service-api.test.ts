@@ -9,9 +9,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { ChatMessage } from '@graasp/chatbox';
 import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import { Item, ItemMembership } from 'graasp';
-import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
 import {

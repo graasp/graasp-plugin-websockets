@@ -6,6 +6,12 @@
  * @author Alexandre CHAU
  */
 
+import {
+  Chat,
+  ChatMessage,
+  ChatService,
+  ChatTaskManager,
+} from '@graasp/chatbox';
 import { FastifyLoggerInstance } from 'fastify';
 import {
   Actor,
@@ -22,10 +28,6 @@ import {
   TaskHookHandlerHelpers,
   TaskRunner,
 } from 'graasp';
-import { ChatService } from 'graasp-plugin-chatbox/dist/db-service';
-import { Chat } from 'graasp-plugin-chatbox/dist/interfaces/chat';
-import { ChatMessage } from 'graasp-plugin-chatbox/dist/interfaces/chat-message';
-import { ChatTaskManager } from 'graasp-plugin-chatbox/dist/interfaces/chat-task-manager';
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
