@@ -107,6 +107,11 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
   // decorate server with service
   fastify.decorate('websockets', wsService);
 
+  // decorate with debug internals in test mode
+  if (process.env.NODE_ENV === 'test') {
+    fastify.decorate('_debug_websocketsChannels', wsChannels);
+  }
+
   // user must have valid session
   fastify.addHook('preHandler', validateSession);
 

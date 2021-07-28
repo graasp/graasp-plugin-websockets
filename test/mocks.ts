@@ -2,8 +2,6 @@
  * graasp-websockets
  *
  * Mock instances for testing in graasp-websockets
- *
- * @author Alexandre CHAU
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

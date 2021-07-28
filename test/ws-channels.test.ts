@@ -2,8 +2,6 @@
  * graasp-websockets
  *
  * Tests for {@link WebSocketChannels}
- *
- * @author Alexandre CHAU
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */

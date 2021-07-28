@@ -2,8 +2,6 @@
  * graasp-websockets
  *
  * Tests for {@link MultiInstanceChannelsBroker}
- *
- * @author Alexandre CHAU
  */
 
 import Redis from 'ioredis';

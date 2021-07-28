@@ -2,16 +2,14 @@
  * graasp-websockets
  *
  * Test utility functions and configuration
- *
- * @author Alexandre CHAU
  */
 
 import fastify, { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
 import WebSocket from 'ws';
+import graaspWebSockets from '../src';
 import { AjvMessageSerializer } from '../src/impls/message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
-import graaspWebSockets from '../src';
 import { WebSocketChannels } from '../src/ws-channels';
 import { mockSessionPreHandler, mockValidateSession } from './mocks';
 
@@ -93,6 +91,15 @@ function createWsChannels(
     channels: wsChannels,
     wss: server,
   };
+}
+
+/**
+ * In test mode, websocket channels are available
+ */
+declare module 'fastify' {
+  interface FastifyInstance {
+    _debug_websocketsChannels: WebSocketChannels;
+  }
 }
 
 /**

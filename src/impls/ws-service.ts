@@ -60,6 +60,9 @@ export class Service implements WebSocketService {
   }
 
   register(topic: string, validateClient: ValidationFn): this {
+    if (this.validators.has(topic)) {
+      throw new Error('WebSocketService.register: topic already exists!');
+    }
     this.validators.set(topic, validateClient);
     return this;
   }
