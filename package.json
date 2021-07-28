@@ -2,8 +2,8 @@
   "name": "graasp-websockets",
   "version": "1.0.0",
   "description": "Websockets extension for graasp",
-  "main": "dist/service-api.js",
-  "types": "dist/service-api.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",

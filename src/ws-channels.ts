@@ -305,7 +305,7 @@ class WebSocketChannels {
   /**
    * Cleanup on server close
    */
-  close() {
+  close(): void {
     clearInterval(this.heartbeat);
   }
 }

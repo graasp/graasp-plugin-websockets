@@ -20,6 +20,7 @@ export interface Error {
 /**
  * Type guard for {@link Error} type
  */
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types, @typescript-eslint/no-explicit-any
 export const isError = (data: any): data is Error => {
   return (
     data &&

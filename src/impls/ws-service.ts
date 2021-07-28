@@ -64,14 +64,18 @@ export class Service implements WebSocketService {
     return this;
   }
 
-  publish<Message>(topic: string, channel: string, message: Message) {
+  publish<Message>(topic: string, channel: string, message: Message): void {
     this.wsMultiBroker.dispatch(
       channel,
       createServerUpdate(topic, channel, message),
     );
   }
 
-  publishLocal<Message>(topic: string, channel: string, message: Message) {
+  publishLocal<Message>(
+    topic: string,
+    channel: string,
+    message: Message,
+  ): void {
     this.wsChannels.channelSend(
       channel,
       createServerUpdate(topic, channel, message),
@@ -138,13 +142,14 @@ export class Service implements WebSocketService {
     data: WebSocket.Data,
     member: Member<UnknownExtra>,
     client: WebSocket,
-  ) {
+  ): void {
     const request = this.parse(data);
 
     // validation error, send bad request
     if (request === undefined) {
       const err = BadRequest();
-      return this.wsChannels.clientSend(client, createServerErrorResponse(err));
+      this.wsChannels.clientSend(client, createServerErrorResponse(err));
+      return;
     }
 
     // request is now type-safe as ClientMessage

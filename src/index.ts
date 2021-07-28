@@ -9,3 +9,6 @@ declare module 'fastify' {
     websockets: WebSocketService;
   }
 }
+
+export * from './service-api';
+export * from './interfaces';
