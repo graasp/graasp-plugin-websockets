@@ -6,6 +6,10 @@
  * @author Alexandre CHAU
  */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-empty-function */
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+
 import { FastifyLoggerInstance } from 'fastify';
 
 export const createMockFastifyLogger = (): FastifyLoggerInstance => ({

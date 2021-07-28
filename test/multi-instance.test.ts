@@ -6,8 +6,6 @@
  * @author Alexandre CHAU
  */
 
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-
 import Redis from 'ioredis';
 import waitForExpect from 'wait-for-expect';
 import globalConfig from '../src/config';
@@ -33,10 +31,10 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   const instance2 = await createWsFastifyInstance(config2);
 
   // register same topic on both instances
-  instance1.websockets.register('foo', async (req) => {
+  instance1.websockets?.register('foo', async (req) => {
     /* don't reject */
   });
-  instance2.websockets.register('foo', async (req) => {
+  instance2.websockets?.register('foo', async (req) => {
     /* don't reject */
   });
 
@@ -71,7 +69,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   const msg = {
     hello: 'world',
   };
-  instance1.websockets.publish('foo', 'test', msg);
+  instance1.websockets?.publish('foo', 'test', msg);
   const values = await Promise.all([test1, test2]);
   values.forEach((value) => {
     expect(value).toStrictEqual({
@@ -89,7 +87,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   const broadcast = {
     baz: 42,
   };
-  instance2.websockets.publish('foo', 'broadcast', broadcast);
+  instance2.websockets?.publish('foo', 'broadcast', broadcast);
   const values2 = await Promise.all([b1, b2]);
   values2.forEach((value) => {
     expect(value).toStrictEqual({
