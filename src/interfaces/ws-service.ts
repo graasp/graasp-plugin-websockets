@@ -1,5 +1,4 @@
-import { Member, UnknownExtra } from 'graasp';
-import { SubscriptionError } from './errors';
+import { SubscriptionRequest } from './request';
 
 /**
  * Public WebSocket service exposed to other consumers on the server
@@ -8,20 +7,14 @@ import { SubscriptionError } from './errors';
 export interface WebSocketService {
   /**
    * Registers a topic (a group of related channels) dedicated to the caller
-   * @param topic topic name, must be unique across server
-   * @param validateClient a function called when a client attempts to
-   *    subscribe to a channel of the topic, which must accept the subscription
-   *    or reject by calling the corresponding parameter with a subscription
-   *    error @see {SubscriptionError}
+   * @param topic           topic name, must be unique across server
+   * @param validateClient  async function called when a client attempts to
+   *                        subscribe to a channel from this topic
    */
   register(
     topic: string,
-    validateClient: (
-      channel: string,
-      member: Member<UnknownExtra>,
-      reject: (error: SubscriptionError) => void,
-    ) => void,
-  );
+    validateClient: (request: SubscriptionRequest) => Promise<void>,
+  ): this;
 
   /**
    * Publishes a message on a channel globally (incl. across server instances)

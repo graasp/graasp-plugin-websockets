@@ -13,6 +13,9 @@ import fws from 'fastify-websocket';
 import Redis from 'ioredis';
 import util from 'util';
 import config from './config';
+import { AjvMessageSerializer } from './impls/message-serializer';
+import { Service } from './impls/ws-service';
+import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
 
 /**
@@ -81,12 +84,54 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
     },
   });
 
+  // Serializer / deserializer instance
+  const serdes = new AjvMessageSerializer();
+
   // create channels abstraction instance
   const wsChannels = new WebSocketChannels(
     fastify.websocketServer,
-    serdes,
+    serdes.serialize,
     log,
   );
+
+  // create multi-instance channels broker
+  const wsMultiBroker = new MultiInstanceChannelsBroker(
+    wsChannels,
+    log,
+    config.redis,
+  );
+
+  // create websockets service
+  const wsService = new Service(wsChannels, wsMultiBroker, serdes.parse, log);
+
+  // decorate server with service
+  fastify.decorate('websockets', wsService);
+
+  // user must have valid session
+  fastify.addHook('preHandler', validateSession);
+
+  // handle incoming requests
+  fastify.get(config.prefix, { websocket: true }, (conn, req) => {
+    // raw websocket client
+    const client = conn.socket;
+    // member from valid session
+    const { member } = req;
+
+    wsChannels.clientRegister(client);
+
+    client.on('message', (msg) => wsService.handleRequest(msg, member, client));
+
+    client.on('close', (code, reason) => {
+      wsChannels.clientRemove(client);
+    });
+  });
+
+  // cleanup on server close
+  fastify.addHook('onClose', (instance, done) => {
+    wsMultiBroker.close();
+    wsChannels.close();
+    done();
+  });
 
   logBootMessage(log, config);
 };

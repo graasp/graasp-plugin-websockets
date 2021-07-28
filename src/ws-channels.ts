@@ -7,7 +7,7 @@
  */
 import WebSocket from 'ws';
 import { Logger } from './interfaces/logger';
-import { MessageSerializer } from './interfaces/message-serializer';
+import { ServerMessage } from './interfaces/message';
 
 /**
  * Represents a WebSocket channel which clients can subscribe to
@@ -15,7 +15,7 @@ import { MessageSerializer } from './interfaces/message-serializer';
  * @member subscribers Subscribers to the channel
  * @member removeIfEmpty whether this channel will eventually be garbage collected when empty
  */
-class Channel<ServerMessageType> {
+class Channel {
   readonly name: string;
   readonly subscribers: Set<WebSocket>;
   readonly removeIfEmpty: boolean;
@@ -27,8 +27,8 @@ class Channel<ServerMessageType> {
   }
 
   send(
-    message: ServerMessageType,
-    sendFn: (client: WebSocket, msg: ServerMessageType) => boolean,
+    message: ServerMessage,
+    sendFn: (client: WebSocket, msg: ServerMessage) => boolean,
   ) {
     let ret = true;
     this.subscribers.forEach((sub) => {
@@ -44,9 +44,9 @@ class Channel<ServerMessageType> {
  * @member subscriptions Channels to which this client is subscribed to
  * @member isAlive Boolean that indicates if this client is still connected
  */
-class Client<ServerMessageType> {
+class Client {
   readonly ws: WebSocket;
-  readonly subscriptions: Set<Channel<ServerMessageType>>;
+  readonly subscriptions: Set<Channel>;
   isAlive: boolean;
 
   constructor(ws: WebSocket) {
@@ -73,36 +73,36 @@ class Client<ServerMessageType> {
  * Channels abstraction over WebSocket server
  * Logic to handle clients and channels
  */
-class WebSocketChannels<ClientMessageType, ServerMessageType> {
+class WebSocketChannels {
   // Underlying WebSocket server
   wsServer: WebSocket.Server;
   // Collection of existing channels, identified by name for lookup
-  channels: Map<string, Channel<ServerMessageType>>;
-  // Collection of all client subscriptions, identified by client for lookup
-  subscriptions: Map<WebSocket, Client<ServerMessageType>>;
-  // Serialization / Deserialization object instance
-  serdes: MessageSerializer<ClientMessageType, ServerMessageType>;
+  channels: Map<string, Channel>;
+  // Collection of all client subscriptions, identified by socket for lookup
+  subscriptions: Map<WebSocket, Client>;
+  // Serializer function
+  serialize: (data: ServerMessage) => WebSocket.Data;
   // Heartbeat interval instance
   heartbeat: NodeJS.Timeout;
 
   /**
    * Creates a new WebSocketChannels instance
    * @param wsServer Underlying WebSocket.Server
-   * @param serdes Message serializer/desserializer for this specific server channels abstraction
+   * @param serialize Seralizer function to convert between JS and WebSocket on-the-wire data
    * @param log Logger output for info, error, debug, ... messages
    * @param heartbeatInterval Time interval in ms between heartbeat checks for lost connections,
    *                          MUST be at least an order of magnitude higher than network RTT
    */
   constructor(
     wsServer: WebSocket.Server,
-    serdes: MessageSerializer<ClientMessageType, ServerMessageType>,
+    serialize: (data: ServerMessage) => WebSocket.Data,
     log: Logger = console,
     heartbeatInterval: number = 30000,
   ) {
     this.wsServer = wsServer;
-    this.serdes = serdes;
     this.channels = new Map();
     this.subscriptions = new Map();
+    this.serialize = serialize;
 
     // checks lost connections every defined time interval
     this.heartbeat = setInterval(() => {
@@ -152,14 +152,13 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
   /**
    * Helper to send a message to a websocket client from this server
    * @param client WebSocket client to send to
-   * @param message ServerMessage to transmit
+   * @param message Data to transmit
    */
-  clientSend(client: WebSocket, message: ServerMessageType): boolean {
+  clientSend(client: WebSocket, message: ServerMessage): boolean {
     if (client.readyState !== WebSocket.OPEN) {
       return false;
     } else {
-      const serialized = this.serdes.serialize(message);
-      client.send(serialized);
+      client.send(this.serialize(message));
       return true;
     }
   }
@@ -244,7 +243,7 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
    * @param removeIfEmpty whether this channel will eventually be garbage collected when empty
    */
   channelCreate(channelName: string, removeIfEmpty: boolean): void {
-    const channel = new Channel<ServerMessageType>(channelName, removeIfEmpty);
+    const channel = new Channel(channelName, removeIfEmpty);
     this.channels.set(channelName, channel);
   }
 
@@ -279,8 +278,9 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
   /**
    * Send a message on a given channel
    * @param channelName name of the channel to send a message on
+   * @param message data to transmit
    */
-  channelSend(channelName: string, message: ServerMessageType): boolean {
+  channelSend(channelName: string, message: ServerMessage): boolean {
     const channel = this.channels.get(channelName);
     if (channel !== undefined) {
       return channel.send(message, (client, message) =>
@@ -294,12 +294,19 @@ class WebSocketChannels<ClientMessageType, ServerMessageType> {
    * Sends an object message to all connected clients
    * @param message Object to broadcast to everyone
    */
-  broadcast(message: ServerMessageType): boolean {
+  broadcast(message: ServerMessage): boolean {
     let ret = true;
     this.wsServer.clients.forEach((client) => {
       ret = ret && this.clientSend(client, message);
     });
     return ret;
+  }
+
+  /**
+   * Cleanup on server close
+   */
+  close() {
+    clearInterval(this.heartbeat);
   }
 }
 
