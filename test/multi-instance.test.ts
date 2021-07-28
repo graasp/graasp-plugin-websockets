@@ -22,7 +22,7 @@ import {
 
 const portGen = new PortGenerator(5000);
 
-test('Message sent on a multi-instance broker is received by all instances', async () => {
+test('multi-instance broker', async () => {
   const config1 = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const config2 = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
@@ -105,7 +105,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   await instance2.close();
 });
 
-test('Message with incorrect format received from Redis triggers log', async () => {
+test('incorrect Redis message format', async () => {
   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const logger = createMockFastifyLogger();
   const logInfoSpy = jest.spyOn(logger, 'info');
