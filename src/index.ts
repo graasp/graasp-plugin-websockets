@@ -1,4 +1,5 @@
 import { WebSocketService } from './interfaces/ws-service';
+import plugin from './service-api';
 
 /**
  * Module augmention for fastify
@@ -10,5 +11,5 @@ declare module 'fastify' {
   }
 }
 
-export * from './service-api';
+export default plugin;
 export * from './interfaces';
