@@ -4,6 +4,8 @@
  * Tests for {@link service-api.ts}
  */
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+
 import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
@@ -128,12 +130,15 @@ describe('internal state', () => {
         topic: 'foo',
       };
       clientSend(t.client!, request);
+
+      // eslint-disable-next-line jest/no-standalone-expect
       expect(await ack).toStrictEqual({
         realm: 'notif',
         type: 'response',
         status: 'success',
         request,
       });
+      // eslint-disable-next-line jest/no-standalone-expect
       expect(
         t.server!._debug_websocketsChannels.channels.get('a')?.subscribers.size,
       ).toEqual(1);
