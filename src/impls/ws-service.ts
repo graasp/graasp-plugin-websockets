@@ -96,7 +96,7 @@ export class Service implements WebSocketService {
       res = createServerErrorResponse(NotFound(), request);
     } else {
       try {
-        validate({
+        await validate({
           channel: request.channel,
           member,
           // allow consumer to reject valiation by throwing an error
@@ -163,7 +163,7 @@ export class Service implements WebSocketService {
           request,
           member,
           client,
-          this.wsChannels.clientSubscribe,
+          (client, channel) => this.wsChannels.clientSubscribe(client, channel),
         );
         break;
       }
@@ -172,7 +172,7 @@ export class Service implements WebSocketService {
           request,
           member,
           client,
-          this.wsChannels.clientSubscribeOnly,
+          (client, channel) => this.wsChannels.clientSubscribeOnly(client, channel),
         );
         break;
       }

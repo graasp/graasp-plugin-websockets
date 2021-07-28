@@ -7,7 +7,7 @@ import plugin from './service-api';
  */
 declare module 'fastify' {
   interface FastifyInstance {
-    websockets: WebSocketService;
+    websockets?: WebSocketService;
   }
 }
 
