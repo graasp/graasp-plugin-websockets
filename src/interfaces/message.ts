@@ -39,8 +39,8 @@ export interface ClientDisconnect extends Message {
  */
 export interface ClientSubscribe extends Message {
   action: typeof CLIENT_ACTION_SUBSCRIBE;
-  channel: string;
   topic: string;
+  channel: string;
 }
 
 /**
@@ -48,6 +48,7 @@ export interface ClientSubscribe extends Message {
  */
 export interface ClientUnsubscribe extends Message {
   action: typeof CLIENT_ACTION_UNSUBSCRIBE;
+  topic: string;
   channel: string;
 }
 
@@ -57,8 +58,8 @@ export interface ClientUnsubscribe extends Message {
  */
 export interface ClientSubscribeOnly extends Message {
   action: typeof CLIENT_ACTION_SUBSCRIBE_ONLY;
-  channel: string;
   topic: string;
+  channel: string;
 }
 
 /**

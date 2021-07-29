@@ -140,7 +140,7 @@ describe('internal state', () => {
       });
       // eslint-disable-next-line jest/no-standalone-expect
       expect(
-        t.server!._debug_websocketsChannels.channels.get('a')?.subscribers.size,
+        t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers.size,
       ).toEqual(1);
     });
 
@@ -150,6 +150,7 @@ describe('internal state', () => {
       const request2: ClientMessage = {
         realm: 'notif',
         action: 'unsubscribe',
+        topic: 'foo',
         channel: 'a',
       };
       clientSend(t.client!, request2);
@@ -160,7 +161,7 @@ describe('internal state', () => {
         request: request2,
       });
       expect(
-        t.server!._debug_websocketsChannels.channels.get('a'),
+        t.server!._debug_websocketsChannels.channels.get('foo/a'),
       ).toBeUndefined();
     });
 
@@ -169,7 +170,7 @@ describe('internal state', () => {
       await waitForExpect(() => {
         // after client closed, channels should not see it as subscriber anymore
         expect(
-          t.server!._debug_websocketsChannels.channels.get('a')?.subscribers
+          t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers
             .size,
         ).toEqual(0);
       });
@@ -180,7 +181,7 @@ describe('internal state', () => {
         expect(client.subscriptions.size).toEqual(1);
       });
 
-      t.server!._debug_websocketsChannels.channelDelete('a');
+      t.server!._debug_websocketsChannels.channelDelete('foo/a');
 
       t.server!._debug_websocketsChannels.subscriptions.forEach((client) => {
         expect(client.subscriptions.size).toEqual(0);
@@ -254,7 +255,7 @@ describe('client requests', () => {
     const msg = clientWait(t.client!, 1);
     channels.forEach((c) =>
       t.server!._debug_websocketsChannels.channelSend(
-        c,
+        'foo/' + c,
         createServerInfo('hello' + c),
       ),
     );
@@ -290,6 +291,7 @@ describe('client requests', () => {
     req = {
       realm: 'notif',
       action: 'unsubscribe',
+      topic: 'foo',
       channel: '1',
     };
     clientSend(t.client!, req);
@@ -304,7 +306,7 @@ describe('client requests', () => {
     // but NOT "you should not receive me"
     ack = clientWait(t.client!, 1);
     t.server!._debug_websocketsChannels.channelSend(
-      '1',
+      'foo/1',
       createServerInfo('you should not receive me'),
     );
 
@@ -331,7 +333,7 @@ describe('client requests', () => {
     // now next message should be "hello again"
     const waitMsg = clientWait(t.client!, 1);
     t.server!._debug_websocketsChannels.channelSend(
-      '1',
+      'foo/1',
       createServerInfo('hello again'),
     );
     const data = await waitMsg;
@@ -420,7 +422,7 @@ describe('channel send', () => {
     const msg = createServerInfo('msg1');
     const test = clientsWait(t.subs1!, 1);
     delete msg.extra;
-    t.server!._debug_websocketsChannels.channelSend('1', msg);
+    t.server!._debug_websocketsChannels.channelSend('foo/1', msg);
     const data = await test;
     data.forEach((value) => expect(value).toStrictEqual(msg));
   });
@@ -429,7 +431,7 @@ describe('channel send', () => {
     const msg = createServerInfo('msg2');
     const test = clientsWait(t.subs2!, 1);
     delete msg.extra;
-    t.server!._debug_websocketsChannels.channelSend('2', msg);
+    t.server!._debug_websocketsChannels.channelSend('foo/2', msg);
     const data = await test;
     data.forEach((value) => expect(value).toStrictEqual(msg));
   });
@@ -441,8 +443,8 @@ describe('channel send', () => {
     delete hello1.extra;
     const test1 = clientsWait(t.subs1!, 1);
     const test2 = clientsWait(t.subs2!, 1);
-    t.server!._debug_websocketsChannels.channelSend('1', hello1);
-    t.server!._debug_websocketsChannels.channelSend('2', hello2);
+    t.server!._debug_websocketsChannels.channelSend('foo/1', hello1);
+    t.server!._debug_websocketsChannels.channelSend('foo/2', hello2);
     const data1 = await test1;
     const data2 = await test2;
     data1.forEach((value) => expect(value).toStrictEqual(hello1));

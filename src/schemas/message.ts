@@ -17,21 +17,22 @@ export const clientMessageSchema: JTDSchemaType<ClientMessage> = {
     subscribe: {
       properties: {
         realm: { enum: ['notif'] },
-        channel: { type: 'string' },
         topic: { type: 'string' },
+        channel: { type: 'string' },
       },
     },
     unsubscribe: {
       properties: {
         realm: { enum: ['notif'] },
+        topic: { type: 'string' },
         channel: { type: 'string' },
       },
     },
     subscribeOnly: {
       properties: {
         realm: { enum: ['notif'] },
-        channel: { type: 'string' },
         topic: { type: 'string' },
+        channel: { type: 'string' },
       },
     },
   },

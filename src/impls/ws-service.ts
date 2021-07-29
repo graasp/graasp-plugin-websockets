@@ -18,6 +18,7 @@ import {
   ClientMessage,
   ClientSubscribe,
   ClientSubscribeOnly,
+  ClientUnsubscribe,
   createServerErrorResponse,
   createServerSuccessResponse,
   createServerUpdate,
@@ -59,33 +60,22 @@ export class Service implements WebSocketService {
     this.logger = log;
   }
 
-  register(topic: string, validateClient: ValidationFn): this {
-    if (this.validators.has(topic)) {
-      throw new Error('WebSocketService.register: topic already exists!');
+  /**
+   * Helper to scope channel by topic
+   * @param channel public channel name
+   * @param topic topic into which the channel should be scoped
+   * @returns low-level unique channel name that includes scoping information
+   */
+  private scope(channel: string, topic: string): string {
+    if (channel === 'broadcast') {
+      return channel;
     }
-    this.validators.set(topic, validateClient);
-    return this;
+    return `${topic}/${channel}`;
   }
 
-  publish<Message>(topic: string, channel: string, message: Message): void {
-    this.wsMultiBroker.dispatch(
-      channel,
-      createServerUpdate(topic, channel, message),
-    );
-  }
-
-  publishLocal<Message>(
-    topic: string,
-    channel: string,
-    message: Message,
-  ): void {
-    this.wsChannels.channelSend(
-      channel,
-      createServerUpdate(topic, channel, message),
-    );
-  }
-
-  // Helper to handle client subscribe and subscribeOnly actions
+  /**
+   * Helper to handle client subscribe and subscribeOnly actions
+   */
   private async handleSubscribe(
     request: ClientSubscribe | ClientSubscribeOnly,
     member: Member<UnknownExtra>,
@@ -108,12 +98,15 @@ export class Service implements WebSocketService {
           },
         });
 
+        // scope channel into topic
+        const scopedChannel = this.scope(request.channel, request.topic);
+
         // no throw so user is allowed, create channel if needed
-        if (!this.wsChannels.channels.has(request.channel)) {
-          this.wsChannels.channelCreate(request.channel, true);
+        if (!this.wsChannels.channels.has(scopedChannel)) {
+          this.wsChannels.channelCreate(scopedChannel, true);
         }
 
-        res = subscribeFn(client, request.channel)
+        res = subscribeFn(client, scopedChannel)
           ? createServerSuccessResponse(request)
           : createServerErrorResponse(NotFound(), request);
       } catch (error) {
@@ -132,6 +125,20 @@ export class Service implements WebSocketService {
     }
 
     this.wsChannels.clientSend(client, res);
+  }
+
+  /**
+   * Helper to handle unsubscribe action
+   */
+  private handleUnsubscribe(request: ClientUnsubscribe, client: WebSocket) {
+    // scope channel into topic
+    const scopedChannel = this.scope(request.channel, request.topic);
+    const res = this.wsChannels.clientUnsubscribe(client, scopedChannel)
+      ? createServerSuccessResponse(request)
+      : createServerErrorResponse(NotFound(), request);
+    this.wsChannels.clientSend(client, res);
+    // preemptively remove channel if empty
+    this.wsChannels.channelDelete(scopedChannel, true);
   }
 
   /**
@@ -162,32 +169,51 @@ export class Service implements WebSocketService {
         break;
       }
       case CLIENT_ACTION_SUBSCRIBE: {
-        this.handleSubscribe(
-          request,
-          member,
-          client,
-          (client, channel) => this.wsChannels.clientSubscribe(client, channel),
+        this.handleSubscribe(request, member, client, (client, channel) =>
+          this.wsChannels.clientSubscribe(client, channel),
         );
         break;
       }
       case CLIENT_ACTION_SUBSCRIBE_ONLY: {
-        this.handleSubscribe(
-          request,
-          member,
-          client,
-          (client, channel) => this.wsChannels.clientSubscribeOnly(client, channel),
+        this.handleSubscribe(request, member, client, (client, channel) =>
+          this.wsChannels.clientSubscribeOnly(client, channel),
         );
         break;
       }
       case CLIENT_ACTION_UNSUBSCRIBE: {
-        const res = this.wsChannels.clientUnsubscribe(client, request.channel)
-          ? createServerSuccessResponse(request)
-          : createServerErrorResponse(NotFound(), request);
-        this.wsChannels.clientSend(client, res);
-        // preemptively remove channel if empty
-        this.wsChannels.channelDelete(request.channel, true);
+        this.handleUnsubscribe(request, client);
         break;
       }
     }
+  }
+
+  register(topic: string, validateClient: ValidationFn): this {
+    if (this.validators.has(topic)) {
+      throw new Error('WebSocketService.register: topic already exists!');
+    }
+    this.validators.set(topic, validateClient);
+    return this;
+  }
+
+  publish<Message>(topic: string, channel: string, message: Message): void {
+    // scope channel into topic
+    const scopedChannel = this.scope(channel, topic);
+    this.wsMultiBroker.dispatch(
+      scopedChannel,
+      createServerUpdate(topic, channel, message),
+    );
+  }
+
+  publishLocal<Message>(
+    topic: string,
+    channel: string,
+    message: Message,
+  ): void {
+    // scope channel into topic
+    const scopedChannel = this.scope(channel, topic);
+    this.wsChannels.channelSend(
+      scopedChannel,
+      createServerUpdate(topic, channel, message),
+    );
   }
 }
