@@ -108,6 +108,30 @@ const plugin = async (fastify, options) => {
 };
 ```
 
+> If you use Typescript to consume the plugin, the compiler may complain that the `websockets` property cannot be found:
+>
+> ```
+> Property 'websockets' does not exist on type 'FastifyInstance<Server, IncomingMessage, ServerResponse, FastifyLoggerInstance>'.
+> ```
+>
+> This is caused by the `fastify` module augmentation defined at [src/index.ts](src/index.ts) not being discovered by the compiler. As a workaround, redeclare the module augmentation with the corresponding property:
+>
+> ```ts
+> // hack to force compiler to discover websockets service
+> declare module 'fastify' {
+>   interface FastifyInstance {
+>     websockets?: WebSocketService;
+>   }
+> }
+>
+> const plugin = async (fastify, options) => {
+>   // 'websockets' should now be available on 'fastify'
+>   const { websockets } = fastify;
+> };
+> ```
+>
+> See https://github.com/graasp/graasp-websockets/issues/19
+
 The `websockets` service exposes the following API: [see `WebSocketService`](src/interfaces/ws-service.ts).
 
 Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`Error`](src/interfaces/error.ts). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
