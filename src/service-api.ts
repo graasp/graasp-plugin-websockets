@@ -112,22 +112,24 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
     fastify.decorate('_debug_websocketsChannels', wsChannels);
   }
 
-  // user must have valid session
-  fastify.addHook('preHandler', validateSession);
-
-  // handle incoming requests
-  fastify.get(config.prefix, { websocket: true }, (conn, req) => {
-    // raw websocket client
-    const client = conn.socket;
-    // member from valid session
-    const { member } = req;
-
-    wsChannels.clientRegister(client);
-
-    client.on('message', (msg) => wsService.handleRequest(msg, member, client));
-
-    client.on('close', (code, reason) => {
-      wsChannels.clientRemove(client);
+  fastify.register(async (fastify) => {
+    // user must have valid session
+    fastify.addHook('preHandler', validateSession);
+  
+    // handle incoming requests
+    fastify.get(config.prefix, { websocket: true }, (conn, req) => {
+      // raw websocket client
+      const client = conn.socket;
+      // member from valid session
+      const { member } = req;
+  
+      wsChannels.clientRegister(client);
+  
+      client.on('message', (msg) => wsService.handleRequest(msg, member, client));
+  
+      client.on('close', (code, reason) => {
+        wsChannels.clientRemove(client);
+      });
     });
   });
 
