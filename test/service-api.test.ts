@@ -2,54 +2,16 @@
  * graasp-websockets
  *
  * Tests for {@link service-api.ts}
- *
- * @author Alexandre CHAU
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { ChatMessage } from '@graasp/chatbox';
 import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
-import { Item, ItemMembership } from 'graasp';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
-import {
-  WS_CLIENT_ACTION_DISCONNECT,
-  WS_CLIENT_ACTION_SUBSCRIBE,
-  WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-  WS_CLIENT_ACTION_UNSUBSCRIBE,
-  WS_ENTITY_CHAT,
-  WS_ENTITY_ITEM,
-  WS_ENTITY_MEMBER,
-  WS_REALM_NOTIF,
-  WS_RESPONSE_STATUS_ERROR,
-  WS_RESPONSE_STATUS_SUCCESS,
-  WS_SERVER_ERROR_ACCESS_DENIED,
-  WS_SERVER_ERROR_GENERIC,
-  WS_SERVER_ERROR_INVALID_REQUEST,
-  WS_SERVER_ERROR_NOT_FOUND,
-  WS_SERVER_TYPE_INFO,
-  WS_SERVER_TYPE_RESPONSE,
-  WS_SERVER_TYPE_UPDATE,
-  WS_UPDATE_KIND_CHAT_ITEM,
-  WS_UPDATE_KIND_CHILD_ITEM,
-  WS_UPDATE_KIND_SHARED_WITH,
-  WS_UPDATE_OP_CREATE,
-  WS_UPDATE_OP_DELETE,
-  WS_UPDATE_OP_PUBLISH,
-} from '../src/interfaces/constants';
+import { AccessDenied } from '../src';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
-import {
-  createMockChatMessage,
-  createMockFastifyLogger,
-  createMockItem,
-  createMockItemMembership,
-  mockChatManager,
-  mockItemMembershipsManager,
-  mockItemsManager,
-  mockTaskRunner,
-} from './mocks';
+import { createMockFastifyLogger } from './mocks';
 import {
   clientSend,
   clientsWait,
@@ -64,13 +26,8 @@ import {
 
 const portGen = new PortGenerator(7000);
 
-afterEach(() => {
-  // make sure that stateful mocks are cleared
-  mockTaskRunner.clearHandlers();
-});
-
-describe('Plugin state and interfaces', () => {
-  test('Plugin logs correctly on boot', async () => {
+describe('plugin options', () => {
+  test('plugin logs on boot', async () => {
     const config: TestConfig = {
       host: '127.0.0.1',
       port: portGen.getNewPort(),
@@ -99,10 +56,10 @@ describe('Plugin state and interfaces', () => {
       );
     });
 
-    server.close();
+    await server.close();
   });
 
-  test('Prefix option is used if present, otherwise default is used', async () => {
+  test('route prefix', async () => {
     const configWithPrefix: TestConfig = {
       host: '127.0.0.1',
       port: portGen.getNewPort(),
@@ -129,424 +86,282 @@ describe('Plugin state and interfaces', () => {
     clientNoPrefix.close();
     serverNoPrefix.close();
   });
+});
 
-  test('Client connecting to server is registered and then removed on close', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-    expect(server.websocketChannels!.subscriptions.size).toEqual(1);
-    client.close();
-    await waitForExpect(() => {
-      expect(server.websocketChannels!.subscriptions.size).toEqual(0);
-    });
-    await server.close();
+describe('internal state', () => {
+  const t: Partial<{
+    config: TestConfig;
+    server: FastifyInstance;
+    client: WebSocket;
+  }> = {};
+
+  beforeEach(async () => {
+    t.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+    t.server = await createWsFastifyInstance(t.config);
+    t.client = await createWsClient(t.config);
   });
 
-  test('Channel with removeIfEmpty is removed when its last subscriber unsubscribes from it', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    server.websocketChannels!.channelCreate('a', true);
-    const client = await createWsClient(config);
-
-    // subscribe to channel "a" and await ack
-    const ack = clientWait(client, 1);
-    const request: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'a',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, request);
-    const ackMsg = await ack;
-    expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request,
-    });
-    expect(
-      server.websocketChannels!.channels.get('a')?.subscribers.size,
-    ).toEqual(1);
-
-    // unsubscribe from channel "a" and await ack
-    const ack2 = clientWait(client, 1);
-    const request2: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_UNSUBSCRIBE,
-      channel: 'a',
-    };
-    clientSend(client, request2);
-    const ack2Msg = await ack2;
-    expect(ack2Msg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: request2,
-    });
-    expect(server.websocketChannels!.channels.get('a')).toBeUndefined();
-
-    client.close();
-    server.close();
+  afterEach(async () => {
+    t.client!.close();
+    await t.server!.close();
   });
 
-  test('Client that is removed is also deleted from channel subscribers', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    server.websocketChannels!.channelCreate('a', false);
-    const client = await createWsClient(config);
-
-    // subscribe to channel "a" and await ack
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'a',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    const ackMsg = await ack;
-    expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-    expect(
-      server.websocketChannels!.channels.get('a')?.subscribers.size,
-    ).toEqual(1);
-
-    client.close();
+  test('client connection registered', async () => {
+    expect(t.server!._debug_websocketsChannels.subscriptions.size).toEqual(1);
+    t.client!.close();
     await waitForExpect(() => {
-      // after client closed, channels should not see it as subscriber anymore
+      expect(t.server!._debug_websocketsChannels.subscriptions.size).toEqual(0);
+    });
+  });
+
+  describe('with channels', () => {
+    beforeEach(async () => {
+      // register a topic with validation
+      t.server!.websockets!.register('foo', async (req) => {
+        /* don't reject */
+      });
+
+      // subscribe to channel "a" and await ack
+      const ack = clientWait(t.client!, 1);
+      const request: ClientMessage = {
+        realm: 'notif',
+        action: 'subscribe',
+        channel: 'a',
+        topic: 'foo',
+      };
+      clientSend(t.client!, request);
+
+      // eslint-disable-next-line jest/no-standalone-expect
+      expect(await ack).toStrictEqual({
+        realm: 'notif',
+        type: 'response',
+        status: 'success',
+        request,
+      });
+      // eslint-disable-next-line jest/no-standalone-expect
       expect(
-        server.websocketChannels!.channels.get('a')?.subscribers.size,
-      ).toEqual(0);
-    });
-    await server.close();
-  });
-
-  test('Removing a channel with subscribers removes subscription from them', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    server.websocketChannels!.channelCreate('a', false);
-    const client = await createWsClient(config);
-
-    // subscribe to channel "a" and await ack
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'a',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    const ackMsg = await ack;
-    expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-    expect(
-      server.websocketChannels!.channels.get('a')?.subscribers.size,
-    ).toEqual(1);
-
-    server.websocketChannels!.subscriptions.forEach((client) => {
-      expect(client.subscriptions.size).toEqual(1);
+        t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers.size,
+      ).toEqual(1);
     });
 
-    server.websocketChannels!.channelDelete('a');
-
-    server.websocketChannels!.subscriptions.forEach((client) => {
-      expect(client.subscriptions.size).toEqual(0);
+    test('flagged channel removed when last subscriber leaves', async () => {
+      // unsubscribe from channel "a" and await ack
+      const ack2 = clientWait(t.client!, 1);
+      const request2: ClientMessage = {
+        realm: 'notif',
+        action: 'unsubscribe',
+        topic: 'foo',
+        channel: 'a',
+      };
+      clientSend(t.client!, request2);
+      expect(await ack2).toStrictEqual({
+        realm: 'notif',
+        type: 'response',
+        status: 'success',
+        request: request2,
+      });
+      expect(
+        t.server!._debug_websocketsChannels.channels.get('foo/a'),
+      ).toBeUndefined();
     });
 
-    client.close();
-    await server.close();
+    test('removed client also deleted from channel subscribers', async () => {
+      t.client!.close();
+      await waitForExpect(() => {
+        // after client closed, channels should not see it as subscriber anymore
+        expect(
+          t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers
+            .size,
+        ).toEqual(0);
+      });
+    });
+
+    test('deleted channel with subscribers removes subscription from them', async () => {
+      t.server!._debug_websocketsChannels.subscriptions.forEach((client) => {
+        expect(client.subscriptions.size).toEqual(1);
+      });
+
+      t.server!._debug_websocketsChannels.channelDelete('foo/a');
+
+      t.server!._debug_websocketsChannels.subscriptions.forEach((client) => {
+        expect(client.subscriptions.size).toEqual(0);
+      });
+    });
   });
 });
 
-describe('Client requests are handled', () => {
-  const testEnv: Partial<{
+describe('client requests', () => {
+  const t: Partial<{
     config: TestConfig;
     server: FastifyInstance;
+    client: WebSocket;
   }> = {};
 
   beforeAll(async () => {
-    testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    testEnv.server = await createWsFastifyInstance(testEnv.config);
-    testEnv.server.websocketChannels!.channelCreate('1', false);
+    t.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+    t.server = await createWsFastifyInstance(t.config);
+    t.client = await createWsClient(t.config);
+    // register a topic with validation
+    t.server!.websockets!.register('foo', async (req) => {
+      /* don't reject */
+    });
   });
 
-  test('Client sending an ill-formed request receives an error message', async () => {
+  afterAll(async () => {
+    await t.server!.close();
+  });
+
+  test('ill-formed request', async () => {
     const msg = { wrong: 'format' };
-    const client = await createWsClient(testEnv.config!);
-    const response = clientWait(client, 1);
-    client.send(JSON.stringify(msg));
-    const data = await response;
-    expect(data).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      status: WS_RESPONSE_STATUS_ERROR,
-      type: WS_SERVER_TYPE_RESPONSE,
+    const response = clientWait(t.client!, 1);
+    t.client!.send(JSON.stringify(msg));
+    expect(await response).toStrictEqual({
+      realm: 'notif',
+      status: 'error',
+      type: 'response',
       error: {
-        name: WS_SERVER_ERROR_INVALID_REQUEST,
+        name: 'BAD_REQUEST',
         message: 'Request message format was not understood by the server',
       },
     });
-    client.close();
   });
 
-  test('Client using subscribeOnly on multiple channels only receives from last', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    server.websocketChannels!.channelCreate('1', false);
-    server.websocketChannels!.channelCreate('2', false);
-    server.websocketChannels!.channelCreate('3', false);
-    server.websocketChannels!.channelCreate('4', false);
-
+  test('subscribeOnly', async () => {
     // subscribe only 4 times in a row to 4 channels
-    const client = await createWsClient(config);
-    const acks = clientWait(client, 4);
-    clientSend(client, {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: '1',
-      entity: WS_ENTITY_ITEM,
-    });
-    clientSend(client, {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: '2',
-      entity: WS_ENTITY_ITEM,
-    });
-    clientSend(client, {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: '3',
-      entity: WS_ENTITY_ITEM,
-    });
-    clientSend(client, {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: '4',
-      entity: WS_ENTITY_ITEM,
-    });
-    const ackMsgs = await acks;
-    const expectedAckMsgs = ['1', '2', '3', '4'].map((c) => ({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: {
-        realm: WS_REALM_NOTIF,
-        action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
+    const acks = clientWait(t.client!, 4);
+    const channels = ['1', '2', '3', '4'];
+    channels.forEach((c) =>
+      clientSend(t.client!, {
+        realm: 'notif',
+        action: 'subscribeOnly',
         channel: c,
-        entity: WS_ENTITY_ITEM,
+        topic: 'foo',
+      }),
+    );
+    const expectedAckMsgs = channels.map((c) => ({
+      realm: 'notif',
+      type: 'response',
+      status: 'success',
+      request: {
+        realm: 'notif',
+        action: 'subscribeOnly',
+        channel: c,
+        topic: 'foo',
       },
     }));
-    expect(ackMsgs).toStrictEqual(expectedAckMsgs);
+    expect(await acks).toStrictEqual(expectedAckMsgs);
 
     // wait for a single message: should only received from channel "4"
-    const waitMsg = clientWait(client, 1);
-    server.websocketChannels!.channelSend('1', createServerInfo('hello1'));
-    server.websocketChannels!.channelSend('2', createServerInfo('hello2'));
-    server.websocketChannels!.channelSend('3', createServerInfo('hello3'));
-    server.websocketChannels!.channelSend('4', createServerInfo('hello4'));
-    const data = await waitMsg;
-    expect(data).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_INFO,
+    const msg = clientWait(t.client!, 1);
+    channels.forEach((c) =>
+      t.server!._debug_websocketsChannels.channelSend(
+        'foo/' + c,
+        createServerInfo('hello' + c),
+      ),
+    );
+    expect(await msg).toStrictEqual({
+      realm: 'notif',
+      type: 'info',
       message: 'hello4',
     });
-
-    client.close();
-    await server.close();
   });
 
-  test('Client using subscribeOnly after subscribe on 2 channels only receives from last', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    // subscribe to first channel
-    const ack1 = clientWait(client, 1);
-    const req1: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'parent1',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req1);
-    expect(await ack1).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req1,
-    });
-
-    // subscribe ONLY to second channel
-    const ack2 = clientWait(client, 1);
-    const req2: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: 'parent2',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req2);
-    expect(await ack2).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req2,
-    });
-
-    // expect next message to be parent notif on channel 2 only
-    const notif = clientWait(client, 1);
-
-    // simulate create child event 1 on task runner
-    const newChildItem1: Item = createMockItem();
-    newChildItem1.path = 'parent1.child';
-    newChildItem1.extra = { foo: 'bar1' };
-    await mockTaskRunner.runPost(
-      mockItemsManager.taskManager.getCreateTaskName(),
-      newChildItem1,
-    );
-
-    // simulate create child event 2 on task runner
-    const newChildItem2: Item = createMockItem();
-    newChildItem2.path = 'parent2.child';
-    newChildItem2.extra = { foo: 'bar2' };
-    await mockTaskRunner.runPost(
-      mockItemsManager.taskManager.getCreateTaskName(),
-      newChildItem2,
-    );
-
-    // should only receive last notif
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'parent2',
-      body: {
-        entity: WS_ENTITY_ITEM,
-        kind: WS_UPDATE_KIND_CHILD_ITEM,
-        op: WS_UPDATE_OP_CREATE,
-        value: newChildItem2,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Client unsubscribing from a channel does not receive messages anymore', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    server.websocketChannels!.channelCreate('1', false);
-    const client = await createWsClient(config);
-
-    let ack, ackMsg;
+  test('unsubscribe', async () => {
+    let ack;
     let req: ClientMessage;
 
-    // subscribe client to channel
+    // subscribe client to channel 1
     req = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
+      realm: 'notif',
+      action: 'subscribe',
       channel: '1',
-      entity: WS_ENTITY_ITEM,
+      topic: 'foo',
     };
-    ack = clientWait(client, 1);
-    clientSend(client, req);
-    ackMsg = await ack;
-    expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
+    ack = clientWait(t.client!, 1);
+    clientSend(t.client!, req);
+    expect(await ack).toStrictEqual({
+      realm: 'notif',
+      type: 'response',
+      status: 'success',
       request: req,
     });
 
-    // unsubscribe client from channel
-    ack = clientWait(client, 1);
+    // unsubscribe client from channel 1
+    ack = clientWait(t.client!, 1);
     req = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_UNSUBSCRIBE,
+      realm: 'notif',
+      action: 'unsubscribe',
+      topic: 'foo',
       channel: '1',
     };
-    clientSend(client, req);
-    ackMsg = await ack;
-    expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
+    clientSend(t.client!, req);
+    expect(await ack).toStrictEqual({
+      realm: 'notif',
+      type: 'response',
+      status: 'success',
       request: req,
     });
 
-    // expect next message to be ack for subscribing again, but NOT "you should not receive me"
-    ack = clientWait(client, 1);
-    server.websocketChannels!.channelSend(
-      '1',
+    // expect next message to be ack for subscribing again
+    // but NOT "you should not receive me"
+    ack = clientWait(t.client!, 1);
+    t.server!._debug_websocketsChannels.channelSend(
+      'foo/1',
       createServerInfo('you should not receive me'),
     );
 
     // subscribe again client to channel
     req = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
+      realm: 'notif',
+      action: 'subscribe',
       channel: '1',
-      entity: WS_ENTITY_ITEM,
+      topic: 'foo',
     };
-    clientSend(client, req);
-    ackMsg = await ack;
+    clientSend(t.client!, req);
+    const ackMsg = await ack;
+
     expect(ackMsg).not.toMatchObject({
       message: 'you should not receive me',
     });
     expect(ackMsg).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
+      realm: 'notif',
+      type: 'response',
+      status: 'success',
       request: req,
     });
 
     // now next message should be "hello again"
-    const waitMsg = clientWait(client, 1);
-    server.websocketChannels!.channelSend('1', createServerInfo('hello again'));
+    const waitMsg = clientWait(t.client!, 1);
+    t.server!._debug_websocketsChannels.channelSend(
+      'foo/1',
+      createServerInfo('hello again'),
+    );
     const data = await waitMsg;
 
     expect(data).not.toMatchObject({
       body: 'you should not receive me',
     });
-
     expect(data).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_INFO,
+      realm: 'notif',
+      type: 'info',
       message: 'hello again',
     });
-
-    client.close();
-    await server.close();
   });
 
-  test('Client sending a disconnect message is removed', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-    expect(server.websocketChannels!.subscriptions.size).toEqual(1);
-    clientSend(client, {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_DISCONNECT,
+  test('disconnect', async () => {
+    expect(t.server!._debug_websocketsChannels.subscriptions.size).toEqual(1);
+    clientSend(t.client!, {
+      realm: 'notif',
+      action: 'disconnect',
     });
     await waitForExpect(() => {
-      expect(server.websocketChannels!.subscriptions.size).toEqual(0);
+      expect(t.server!._debug_websocketsChannels.subscriptions.size).toEqual(0);
     });
-    client.close();
-    await server.close();
-  });
-
-  afterAll(() => {
-    testEnv.server!.close();
   });
 });
 
-describe('Channel messages sent by server are received by clients', () => {
-  const testEnv: Partial<{
+describe('channel send', () => {
+  const t: Partial<{
     server: FastifyInstance;
     subs1: Array<WebSocket>;
     subs2: Array<WebSocket>;
@@ -556,708 +371,148 @@ describe('Channel messages sent by server are received by clients', () => {
   beforeAll(async () => {
     const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
-    testEnv.server = await createWsFastifyInstance(config);
+    t.server = await createWsFastifyInstance(config);
 
-    // create some channels
-    const channels = testEnv.server.websocketChannels;
-    channels!.channelCreate('1', false);
-    channels!.channelCreate('2', false);
+    // register a topic with validation
+    t.server!.websockets!.register('foo', async (req) => {
+      /* don't reject */
+    });
 
     const numClients = 5;
     let ack;
 
     // spawn 5 clients and sub them to channel 1
-    testEnv.subs1 = await createWsClients(config, numClients);
-    ack = clientsWait(testEnv.subs1, 1);
-    testEnv.subs1.forEach((client) =>
+    t.subs1 = await createWsClients(config, numClients);
+    ack = clientsWait(t.subs1, 1);
+    t.subs1.forEach((client) =>
       clientSend(client, {
-        realm: WS_REALM_NOTIF,
-        action: WS_CLIENT_ACTION_SUBSCRIBE,
+        realm: 'notif',
+        action: 'subscribe',
         channel: '1',
-        entity: WS_ENTITY_ITEM,
+        topic: 'foo',
       }),
     );
     await ack;
 
     // spawn 5 clients and sub them to channel 2
-    testEnv.subs2 = await createWsClients(config, numClients);
-    ack = clientsWait(testEnv.subs2, 1);
-    testEnv.subs2.forEach((client) =>
+    t.subs2 = await createWsClients(config, numClients);
+    ack = clientsWait(t.subs2, 1);
+    t.subs2.forEach((client) =>
       clientSend(client, {
-        realm: WS_REALM_NOTIF,
-        action: WS_CLIENT_ACTION_SUBSCRIBE,
+        realm: 'notif',
+        action: 'subscribe',
         channel: '2',
-        entity: WS_ENTITY_ITEM,
+        topic: 'foo',
       }),
     );
     await ack;
 
     // spawn 5 clients and don't sub them
-    testEnv.unsubs = await createWsClients(config, numClients);
+    t.unsubs = await createWsClients(config, numClients);
   });
 
-  test("Clients subscribed to channel '1' all receive 'msg1'", async () => {
+  afterAll(async () => {
+    t.subs1!.forEach((client) => client.close());
+    t.subs2!.forEach((client) => client.close());
+    t.unsubs!.forEach((client) => client.close());
+    await t.server!.close();
+  });
+
+  test('channel 1', async () => {
     const msg = createServerInfo('msg1');
-    const test = clientsWait(testEnv.subs1!, 1);
+    const test = clientsWait(t.subs1!, 1);
     delete msg.extra;
-    testEnv.server!.websocketChannels!.channelSend('1', msg);
+    t.server!._debug_websocketsChannels.channelSend('foo/1', msg);
     const data = await test;
     data.forEach((value) => expect(value).toStrictEqual(msg));
   });
 
-  test("Clients subscribed to channel '2' all receive 'msg2", async () => {
+  test('channel 2', async () => {
     const msg = createServerInfo('msg2');
-    const test = clientsWait(testEnv.subs2!, 1);
+    const test = clientsWait(t.subs2!, 1);
     delete msg.extra;
-    testEnv.server!.websocketChannels!.channelSend('2', msg);
+    t.server!._debug_websocketsChannels.channelSend('foo/2', msg);
     const data = await test;
     data.forEach((value) => expect(value).toStrictEqual(msg));
   });
 
-  test("Clients subscribed to channel '2' all receive 'hello2' but not 'hello1' sent to channel '1'", async () => {
+  test('channel 2 but not channel 1', async () => {
     const hello2 = createServerInfo('hello2');
     delete hello2.extra;
     const hello1 = createServerInfo('hello1');
     delete hello1.extra;
-    const test1 = clientsWait(testEnv.subs1!, 1);
-    const test2 = clientsWait(testEnv.subs2!, 1);
-    testEnv.server!.websocketChannels!.channelSend('1', hello1);
-    testEnv.server!.websocketChannels!.channelSend('2', hello2);
+    const test1 = clientsWait(t.subs1!, 1);
+    const test2 = clientsWait(t.subs2!, 1);
+    t.server!._debug_websocketsChannels.channelSend('foo/1', hello1);
+    t.server!._debug_websocketsChannels.channelSend('foo/2', hello2);
     const data1 = await test1;
     const data2 = await test2;
     data1.forEach((value) => expect(value).toStrictEqual(hello1));
     data2.forEach((value) => expect(value).toStrictEqual(hello2));
   });
 
-  test('All clients receive broadcasts even if not subscribed to channels', async () => {
+  test('broadcast', async () => {
     const broadcastMsg = createServerInfo('hello world');
     delete broadcastMsg.extra;
     const clientsShouldReceive = new Array<WebSocket>().concat(
-      testEnv.subs1!,
-      testEnv.subs2!,
-      testEnv.unsubs!,
+      t.subs1!,
+      t.subs2!,
+      t.unsubs!,
     );
     const test = clientsWait(clientsShouldReceive, 1);
-    testEnv.server!.websocketChannels!.broadcast(broadcastMsg);
+    t.server!._debug_websocketsChannels!.broadcast(broadcastMsg);
+
     const data = await test;
     data.forEach((value) => expect(value).toStrictEqual(broadcastMsg));
   });
-
-  afterAll(async () => {
-    testEnv.subs1!.forEach((client) => client.close());
-    testEnv.subs2!.forEach((client) => client.close());
-    testEnv.unsubs!.forEach((client) => client.close());
-    await testEnv.server!.close();
-  });
 });
 
-describe('Graasp-specific behaviour', () => {
-  test('Creating an item with a parent triggers notification on parent channel', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'parent',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate create child event on task runner
-    const newChildItem: Item = createMockItem();
-    newChildItem.path = 'parent.child';
-    newChildItem.extra = { foo: 'bar' };
-    await mockTaskRunner.runPost(
-      mockItemsManager.taskManager.getCreateTaskName(),
-      newChildItem,
-    );
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'parent',
-      body: {
-        entity: WS_ENTITY_ITEM,
-        kind: WS_UPDATE_KIND_CHILD_ITEM,
-        op: WS_UPDATE_OP_CREATE,
-        value: newChildItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Deleting an item with a parent triggers notification on parent channel', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'parent',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate delete child event on task runner
-    const deletedChildItem: Item = createMockItem();
-    deletedChildItem.path = 'parent.child';
-    deletedChildItem.extra = { foo: 'bar' };
-    await mockTaskRunner.runPost(
-      mockItemsManager.taskManager.getDeleteTaskName(),
-      deletedChildItem,
-    );
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'parent',
-      body: {
-        entity: WS_ENTITY_ITEM,
-        kind: WS_UPDATE_KIND_CHILD_ITEM,
-        op: WS_UPDATE_OP_DELETE,
-        value: deletedChildItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Copying an item triggers notification on destination parent channel', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'parent',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate copy into child event on task runner
-    const copiedChildItem: Item = createMockItem();
-    copiedChildItem.path = 'parent.child';
-    copiedChildItem.extra = { foo: 'bar' };
-    await mockTaskRunner.runPost(
-      mockItemsManager.taskManager.getCopyTaskName(),
-      copiedChildItem,
-    );
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'parent',
-      body: {
-        entity: WS_ENTITY_ITEM,
-        kind: WS_UPDATE_KIND_CHILD_ITEM,
-        op: WS_UPDATE_OP_CREATE,
-        value: copiedChildItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Deleting an item triggers notification on all members that have memberships on it', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'memberWithMembership',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate delete child event on task runner
-    const deletedChildItem: Item = createMockItem();
-    // setup mock DB to return membership
-    (
-      mockItemsManager.dbService.membersWithSharedItem as jest.Mock
-    ).mockReturnValueOnce(Promise.resolve(['memberWithMembership']));
-    await mockTaskRunner.runPre(
-      mockItemsManager.taskManager.getDeleteTaskName(),
-      deletedChildItem,
-    );
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'memberWithMembership',
-      body: {
-        entity: WS_ENTITY_MEMBER,
-        kind: WS_UPDATE_KIND_SHARED_WITH,
-        op: WS_UPDATE_OP_DELETE,
-        value: deletedChildItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Creating an item membership triggers notification on member channel', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'mockMemberId',
-      entity: WS_ENTITY_MEMBER,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate create item membership on task runner
-    const newMembership: ItemMembership = createMockItemMembership();
-    newMembership.memberId = 'mockMemberId';
-    await mockTaskRunner.runPost(
-      mockItemMembershipsManager.taskManager.getCreateTaskName(),
-      newMembership,
-    );
-    // expected object is mock item created in mocks.ts
-    const mockItem = createMockItem();
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'mockMemberId',
-      body: {
-        entity: WS_ENTITY_MEMBER,
-        kind: WS_UPDATE_KIND_SHARED_WITH,
-        op: WS_UPDATE_OP_CREATE,
-        value: mockItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-
-  test('Deleting an item membership triggers notification on member channel', async () => {
-    const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    const server = await createWsFastifyInstance(config);
-    const client = await createWsClient(config);
-
-    const ack = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'mockMemberId',
-      entity: WS_ENTITY_MEMBER,
-    };
-    clientSend(client, req);
-    expect(await ack).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_SUCCESS,
-      request: req,
-    });
-
-    // expect next message to be parent notif
-    const notif = clientWait(client, 1);
-    // simulate delete item membership on task runner
-    const removedMembership: ItemMembership = createMockItemMembership();
-    removedMembership.memberId = 'mockMemberId';
-    // setup mock DB to return this membership
-    (mockItemMembershipsManager.dbService.get as jest.Mock).mockReturnValueOnce(
-      removedMembership,
-    );
-    await mockTaskRunner.runPre(
-      mockItemMembershipsManager.taskManager.getDeleteTaskName(),
-      removedMembership,
-    );
-    // expected object is mock item created in mocks.ts
-    const mockItem = createMockItem();
-    expect(await notif).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_UPDATE,
-      channel: 'mockMemberId',
-      body: {
-        entity: WS_ENTITY_MEMBER,
-        kind: WS_UPDATE_KIND_SHARED_WITH,
-        op: WS_UPDATE_OP_DELETE,
-        value: mockItem,
-      },
-    });
-
-    client.close();
-    server.close();
-  });
-});
-
-test('Publishing a new message triggers notification on chat channel', async () => {
-  const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-  const server = await createWsFastifyInstance(config);
-  const client = await createWsClient(config);
-
-  const ack = clientWait(client, 1);
-  const req: ClientMessage = {
-    realm: WS_REALM_NOTIF,
-    action: WS_CLIENT_ACTION_SUBSCRIBE,
-    channel: 'mockChatId',
-    entity: WS_ENTITY_CHAT,
-  };
-  clientSend(client, req);
-  expect(await ack).toStrictEqual({
-    realm: WS_REALM_NOTIF,
-    type: WS_SERVER_TYPE_RESPONSE,
-    status: WS_RESPONSE_STATUS_SUCCESS,
-    request: req,
-  });
-
-  // expect next message to be chat notif
-  const notif = clientWait(client, 1);
-  // simulate publish message on task runner
-  const mockMessage: ChatMessage = createMockChatMessage();
-  await mockTaskRunner.runPost(
-    mockChatManager.taskManager.getPublishMessageTaskName(),
-    mockMessage,
-  );
-  // expected object is mock message
-  expect(await notif).toStrictEqual({
-    realm: WS_REALM_NOTIF,
-    type: WS_SERVER_TYPE_UPDATE,
-    channel: 'mockChatId',
-    body: {
-      entity: WS_ENTITY_CHAT,
-      kind: WS_UPDATE_KIND_CHAT_ITEM,
-      op: WS_UPDATE_OP_PUBLISH,
-      value: mockMessage,
-    },
-  });
-
-  client.close();
-  server.close();
-});
-
-describe('Erroneous cases are handled', () => {
-  const testEnv: any = {};
+describe('error cases', () => {
+  const t: Partial<{
+    config: TestConfig;
+    server: FastifyInstance;
+    client: WebSocket;
+  }> = {};
 
   beforeEach(async () => {
-    testEnv.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-    testEnv.server = await createWsFastifyInstance(testEnv.config);
-    testEnv.client = await createWsClient(testEnv.config);
+    t.config = createDefaultLocalConfig({ port: portGen.getNewPort() });
+    t.server = await createWsFastifyInstance(t.config);
+    t.client = await createWsClient(t.config);
   });
 
-  test('Subscribing to a member channel that is not client itself is forbidden', async () => {
-    const { client } = testEnv;
+  afterEach(async () => {
+    t.client!.close();
+    await t.server!.close();
+  });
 
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'anotherMemberId',
-      entity: WS_ENTITY_MEMBER,
+  test('rejected validation', async () => {
+    t.server!.websockets!.register('foo', async (req) => {
+      // always reject
+      req.reject(AccessDenied());
+    });
+
+    // subscribe to channel a, expect error response
+    const ack = clientWait(t.client!, 1);
+    const request: ClientMessage = {
+      realm: 'notif',
+      action: 'subscribe',
+      channel: 'a',
+      topic: 'foo',
     };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
+    clientSend(t.client!, request);
+    expect(await ack).toStrictEqual({
+      realm: 'notif',
+      type: 'response',
+      status: 'error',
       error: {
-        name: WS_SERVER_ERROR_ACCESS_DENIED,
-        message:
-          'Unable to subscribe to channel anotherMemberId: user access denied for this channel',
+        name: 'ACCESS_DENIED',
+        message: 'Access denied for the requested resource',
       },
-      request: req,
+      request,
     });
   });
 
-  test('Subscribing to an item that does not exist in database is forbidden', async () => {
-    const { client } = testEnv;
-
-    // setup mock to return null when db fetches invalid item
-    (mockItemsManager.dbService.get as jest.Mock).mockReturnValueOnce(
-      Promise.resolve(null),
-    );
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'someInvalidItemId',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_NOT_FOUND,
-        message:
-          'Unable to subscribe to channel someInvalidItemId: user or channel not found',
-      },
-      request: req,
-    });
-  });
-
-  test('Subscribing to an item which user does not have access to is forbidden', async () => {
-    const { client } = testEnv;
-
-    // setup mock to return false when permission is checked
-    (
-      mockItemMembershipsManager.dbService.canRead as jest.Mock
-    ).mockReturnValueOnce(Promise.resolve(false));
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'someUnauthorizedItem',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_ACCESS_DENIED,
-        message:
-          'Unable to subscribe to channel someUnauthorizedItem: user access denied for this channel',
-      },
-      request: req,
-    });
-  });
-
-  test('Subscribing ONLY to a member channel that is not client itself is forbidden', async () => {
-    const { client } = testEnv;
-
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: 'anotherMemberId',
-      entity: WS_ENTITY_MEMBER,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_ACCESS_DENIED,
-        message:
-          'Unable to subscribe to channel anotherMemberId: user access denied for this channel',
-      },
-      request: req,
-    });
-  });
-
-  test('Subscribing ONLY to an item that does not exist in database is forbidden', async () => {
-    const { client } = testEnv;
-
-    // setup mock to return null when db fetches invalid item
-    (mockItemsManager.dbService.get as jest.Mock).mockReturnValueOnce(
-      Promise.resolve(null),
-    );
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: 'someInvalidItemId',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_NOT_FOUND,
-        message:
-          'Unable to subscribe to channel someInvalidItemId: user or channel not found',
-      },
-      request: req,
-    });
-  });
-
-  test('Subscribing ONLY to an item which user does not have access to is forbidden', async () => {
-    const { client } = testEnv;
-
-    // setup mock to return false when permission is checked
-    (
-      mockItemMembershipsManager.dbService.canRead as jest.Mock
-    ).mockReturnValueOnce(Promise.resolve(false));
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: 'someUnauthorizedItem',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_ACCESS_DENIED,
-        message:
-          'Unable to subscribe to channel someUnauthorizedItem: user access denied for this channel',
-      },
-      request: req,
-    });
-  });
-
-  test("Subscribing to a channel when the user or channel doesn't exist anymore triggers not found error", async () => {
-    const { server, client } = testEnv;
-
-    // force flush users
-    server.websocketChannels!.channels.clear();
-    server.websocketChannels!.subscriptions.clear();
-
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'someItemId',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_NOT_FOUND,
-        message:
-          'Unable to subscribe to channel someItemId: user or channel not found',
-      },
-      request: req,
-    });
-  });
-
-  test("Subscribing ONLY to a channel when the user or channel doesn't exist anymore triggers not found error", async () => {
-    const { server, client } = testEnv;
-
-    // force flush users
-    server.websocketChannels!.channels.clear();
-    server.websocketChannels!.subscriptions.clear();
-
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE_ONLY,
-      channel: 'someItemId',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_NOT_FOUND,
-        message:
-          'Unable to subscribe to channel someItemId: user or channel not found',
-      },
-      request: req,
-    });
-  });
-
-  test("Unsubscribing from a channel that doesn't exist triggers not found error", async () => {
-    const { client } = testEnv;
-
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_UNSUBSCRIBE,
-      channel: 'someNonExistentItemId',
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_NOT_FOUND,
-        message:
-          'Unable to subscribe to channel someNonExistentItemId: user or channel not found',
-      },
-      request: req,
-    });
-  });
-
-  test('Database crash while fetching item triggers server error response', async () => {
-    const { client } = testEnv;
-
-    // setup mock to fail DB fetch and raise error by returning rejected error
-    (mockItemsManager.dbService.get as jest.Mock).mockRejectedValueOnce(
-      new Error('Mock DB error'),
-    );
-    const error = clientWait(client, 1);
-    const req: ClientMessage = {
-      realm: WS_REALM_NOTIF,
-      action: WS_CLIENT_ACTION_SUBSCRIBE,
-      channel: 'someItemId',
-      entity: WS_ENTITY_ITEM,
-    };
-    clientSend(client, req);
-    expect(await error).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_RESPONSE,
-      status: WS_RESPONSE_STATUS_ERROR,
-      error: {
-        name: WS_SERVER_ERROR_GENERIC,
-        message: 'Database error',
-      },
-      request: req,
-    });
-  });
-
-  test('Unexpected server error is caught by top-level error handler', async () => {
+  test('top-level error handler', async () => {
     const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
     // setup logger with spy on error output, inject it into server
@@ -1284,12 +539,6 @@ describe('Erroneous cases are handled', () => {
     });
 
     client.close();
-    server.close();
-  });
-
-  afterEach(async () => {
-    const { client, server } = testEnv;
-    client.close();
-    server.close();
+    await server.close();
   });
 });

@@ -1,9 +1,9 @@
 {
   "name": "graasp-websockets",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Websockets extension for graasp",
-  "main": "dist/src/service-api.js",
-  "types": "dist/src/service-api.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
@@ -20,14 +20,18 @@
     "graasp",
     "websockets"
   ],
-  "author": "Alexandre CHAU",
-  "license": "GPL-3.0-or-later",
+  "author": "React EPFL",
+  "contributors": [
+    "Alexandre Chau",
+    "André Nogueira"
+  ],
+  "license": "AGPL-3.0-or-later",
   "bugs": {
     "url": "https://github.com/graasp/graasp-websockets/issues"
   },
   "homepage": "https://github.com/graasp/graasp-websockets#readme",
   "dependencies": {
-    "ajv-latest": "npm:ajv@^8.6.0",
+    "ajv": "^8.6.2",
     "dotenv": "^9.0.2",
     "fastify": "^3.18.1",
     "fastify-plugin": "^3.0.0",
@@ -35,7 +39,6 @@
     "ioredis": "^4.27.6"
   },
   "devDependencies": {
-    "@graasp/chatbox": "git://github.com/graasp/graasp-plugin-chatbox.git",
     "@types/graasp": "git://github.com/graasp/graasp-types.git",
     "@types/ioredis": "^4.26.4",
     "@types/jest": "^26.0.23",

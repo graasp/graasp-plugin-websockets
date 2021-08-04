@@ -23,27 +23,47 @@ Add this plugin repository to the dependencies section of the `package.json` of 
 
 In the file of the designated WebSocket endpoint route, import the plugin:
 
-```js
+```ts
 import graaspWebSockets from 'graasp-websockets';
 ```
 
 Register the plugin on your Fastify instance (here `instance` is the core Graasp Fastify instance, initialized / obtained beforehand):
 
-```js
-instance
-    // make sure to register the dependent services before!
-    .register(databasePlugin, ...)
-    .register(authPlugin, ...)
-    .register(ItemMembershipsServiceApi)
-    .register(ItemsServiceApi)
+```ts
+    // make sure to register dependent services before!
+    await instance.register(authPlugin, ...)
     //...
     // then register graasp-websockets as follows
-    .register(graaspWebSockets);
+    await instance.register(graaspWebSockets);
 ```
 
-Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (e.g. `items`, `itemMemberships`, `taskRunner`, `validateSession`, ...)!
+Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (i.e. `validateSession`, `log`)!
 
-If you'd like to access the properties that are decorated by the plugin (such as `websocketChannels` and `websocketChannelsBroker`) or ensure that the behaviour is registered on server boot and not asynchronously later, make sure to await the register call.
+The plugin accepts the following options (which all have sane defaults):
+
+```ts
+    await instance.register(graaspWebSockets, {
+        prefix: '/ws',
+        redis: {
+            config: {
+                host: REDIS_HOST,
+                port: +REDIS_PORT,
+                username: REDIS_USERNAME,
+                password: REDIS_PASSWORD,
+                ... // any other Redis.RedisOptions property from 'ioredis'
+            }
+            channelName: 'graasp-notif',
+        }
+    });
+```
+
+where:
+
+- `prefix` is the route of the websocket endpoint, relative to current registration scope. Websocket clients connect to this route to upgrade from HTTP(S) to WS(S).
+- `redis.config` is the configuration required to connect to the Redis server instance, which can contain any property from the `Redis.RedisOptions` type from `ioredis` ([see API reference](https://github.com/luin/ioredis/blob/master/API.md#new-redisport-host-options)).
+- `redis.channelName` is the name of the Redis pub/sub channel used to share websocket messages across multiple server instance (for instance in a cluster).
+
+The plugin will also decorate the Fastify instance with a websocket service under the `websockets` property. Read [USAGE.md](USAGE.md) for instructions on how to consume this service from other parts of the server, such as other plugins.
 
 ## Adding behaviour with websockets
 
@@ -83,24 +103,6 @@ Files are compiled into the `dist/` folder.
 
 You can then run tests as described [below](#testing), or import parts of the implementation into your own files.
 
-### Channels module example
-
-The [`examples/chat`](examples/chat/) folder provides an example usage of the [WebSocketChannels](src/ws-channels.ts) class for a use case unrelated to Graasp  by implementing a chat application on top of the channels abstraction.
-
-Make sure to build the code as mentioned [above](#building-locally), then run the server with the following command from the root of the repo:
-
-```
-node dist/examples/chat/server.js
-```
-
-Then open the client multiple times using your favorite browser (substitute `firefox` with your browser of choice, or simply find the file in your file manager and open it several times):
-
-```
-firefox examples/chat/client.html
-```
-
-You should be able to send chat messages across all your page instances in your browser.
-
 ## Cleaning artifacts
 
 You can clean compiled and generated files from the repository folder using:
@@ -111,7 +113,7 @@ npm run clean
 
 ## Testing
 
-Several test suites are provided in folder [`test/`](test/). They include unit tests as well as end-to-end tests written for the [Jest](https://jestjs.io/) testing framework using the [ts-jest](https://kulshekhar.github.io/ts-jest/) transformer to run TypeScript tests directly. The configuration is specified by [`jest.config.js`](jest.config.js) with TypeScript compiler config [`tsconfig.test.json`](tsconfig.test.json).
+Several test suites are provided in folder [`test/`](test/). They include unit tests as well as end-to-end tests written for the [Jest](https://jestjs.io/) testing framework using the [ts-jest](https://kulshekhar.github.io/ts-jest/) transformer to run TypeScript tests directly. The configuration is specified by [`jest.config.js`](jest.config.js).
 
 To run the tests, make sure that you have installed the dependencies at least once:
 
@@ -160,12 +162,10 @@ If your project depends on `graasp-websockets`, cannot fetch the `graasp-websock
 ## Repository structure
 
 - [`.github/`](.github/): Github-related configurations, such as Actions
-- [`examples/`](examples/): example usages of the modules in `graasp-websockets`
-- [`report/`](report/): technical project report, read this if you want a more in-depth look at the project architecture
 - [`src/`](src/): source code of the `graasp-websockets` plugin and its modules
 - [`test/`](test/): Jest unit and end-to-end tests (file names match sources in `src/`)
 - [`README.md`](README.md): [this file](README.md)
-- [`tsconfig.json`](tsconfig.json): TypeScript compiler configuration for release
+- [`tsconfig.json`](tsconfig.json): TypeScript compiler configuration
 
 ## Author
 
@@ -173,7 +173,7 @@ This project was originally written for a 2021 Master Semester project at the RE
 
 - Alexandre CHAU (alexandre.chau@alumni.epfl.ch)
 - [
-Coordination & Interaction Systems Group (REACT)](https://www.epfl.ch/labs/react/)
+  Coordination & Interaction Systems Group (REACT)](https://www.epfl.ch/labs/react/)
 - [Ecole Polytechnique Fédérale de Lausanne (EPFL)](https://www.epfl.ch/)
 
 Acknowledgements:

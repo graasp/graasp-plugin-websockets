@@ -2,8 +2,6 @@
  * graasp-websockets
  *
  * Tests for fastify
- *
- * @author Alexandre CHAU
  */
 
 import fws from 'fastify-websocket';

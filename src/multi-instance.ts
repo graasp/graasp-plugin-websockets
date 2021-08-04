@@ -6,30 +6,28 @@
  *
  * ! In this file, we distinguish WS channels (part of the {@link WebSocketChannels} abstraction)
  * and Redis channels (from the Redis Pub/Sub mechanism which handles inter-instance communication) !
- *
- * @author Alexandre CHAU
  */
 
-import { JTDSchemaType } from 'ajv-latest/dist/core';
-import Ajv from 'ajv-latest/dist/jtd';
+import { JTDSchemaType } from 'ajv/dist/core';
+import Ajv from 'ajv/dist/jtd';
 import Redis from 'ioredis';
-import { WS_REALM_NOTIF } from './interfaces/constants';
+import { REALM_NOTIF } from './interfaces/constants';
 import { Logger } from './interfaces/logger';
-import { ClientMessage, ServerMessage } from './interfaces/message';
-import { serverMessageSchema } from './schemas/message-schema';
+import { ServerMessage } from './interfaces/message';
+import { serverMessageSchema } from './schemas';
 import { WebSocketChannels } from './ws-channels';
 
 /**
  * Represents deserialized messages sent over Redis
  * Wraps {@link ServerMessage} with meta to recognize underlying WS channels
- * @param realm must be WS_REALM_NOTIF to allow future-proofing
+ * @param realm must be REALM_NOTIF to allow future-proofing
  * @param channel name of the WS channel on which to send the notification, or "broadcast" if it should be sent to all
- * @param notif notification to be sent on the WS channel
+ * @param data data to be sent on the WS channel
  */
 interface RedisMessage {
-  realm: typeof WS_REALM_NOTIF;
+  realm: typeof REALM_NOTIF;
   channel: string | 'broadcast';
-  notif: ServerMessage;
+  data: ServerMessage;
 }
 
 /**
@@ -42,9 +40,9 @@ function createRedisMessage(
   channel: string | 'broadcast',
 ): RedisMessage {
   return {
-    realm: WS_REALM_NOTIF,
+    realm: REALM_NOTIF,
     channel: channel,
-    notif: serverMessage,
+    data: serverMessage,
   };
 }
 
@@ -56,7 +54,7 @@ const redisMessageSchema: JTDSchemaType<RedisMessage> = {
   properties: {
     realm: { enum: ['notif'] },
     channel: { type: 'string' },
-    notif: serverMessageSchema,
+    data: serverMessageSchema,
   },
 };
 
@@ -89,7 +87,7 @@ function createRedisClientInstance(
  */
 class MultiInstanceChannelsBroker {
   // WS channels abstraction instance
-  private readonly wsChannels: WebSocketChannels<ClientMessage, ServerMessage>;
+  private readonly wsChannels: WebSocketChannels;
   // Redis client subscriber instance
   private readonly sub: Redis.Redis;
   // Redis client publisher instance
@@ -98,7 +96,7 @@ class MultiInstanceChannelsBroker {
   private readonly notifChannel: string;
 
   constructor(
-    wsChannels: WebSocketChannels<ClientMessage, ServerMessage>,
+    wsChannels: WebSocketChannels,
     log: Logger = console,
     redisParams: {
       config: Redis.RedisOptions;
@@ -129,9 +127,9 @@ class MultiInstanceChannelsBroker {
         } else {
           // forward notification to respective channel
           if (msg.channel === 'broadcast') {
-            this.wsChannels.broadcast(msg.notif);
+            this.wsChannels.broadcast(msg.data);
           } else {
-            this.wsChannels.channelSend(msg.channel, msg.notif);
+            this.wsChannels.channelSend(msg.channel, msg.data);
           }
         }
       }
@@ -155,7 +153,7 @@ class MultiInstanceChannelsBroker {
    */
   async close(): Promise<void> {
     // cleanup open resources
-    await this.sub.unsubscribe(WS_REALM_NOTIF);
+    await this.sub.unsubscribe(REALM_NOTIF);
     this.sub.disconnect();
     this.pub.disconnect();
   }

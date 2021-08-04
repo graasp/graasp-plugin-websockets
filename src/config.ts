@@ -2,8 +2,6 @@
  * graasp-websockets
  *
  * Local configuration for graasp-websockets plugin
- *
- * @author Alexandre CHAU
  */
 
 import dotenv from 'dotenv';

@@ -2,24 +2,12 @@
  * graasp-websockets
  *
  * Tests for {@link MultiInstanceChannelsBroker}
- *
- * @author Alexandre CHAU
  */
-
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 import Redis from 'ioredis';
 import waitForExpect from 'wait-for-expect';
 import globalConfig from '../src/config';
-import {
-  WS_CLIENT_ACTION_SUBSCRIBE,
-  WS_ENTITY_ITEM,
-  WS_REALM_NOTIF,
-  WS_RESPONSE_STATUS_SUCCESS,
-  WS_SERVER_TYPE_INFO,
-  WS_SERVER_TYPE_RESPONSE,
-} from '../src/interfaces/constants';
-import { ClientMessage } from '../src/interfaces/message';
+import { ClientSubscribe } from '../src/interfaces/message';
 import { createMockFastifyLogger } from './mocks';
 import {
   clientSend,
@@ -32,17 +20,21 @@ import {
 
 const portGen = new PortGenerator(5000);
 
-test('Message sent on a multi-instance broker is received by all instances', async () => {
+test('multi-instance broker', async () => {
   const config1 = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const config2 = createDefaultLocalConfig({ port: portGen.getNewPort() });
 
-  // create 2 independent instance of channels broker
+  // create 2 independent instance of server on 2 different ports
   const instance1 = await createWsFastifyInstance(config1);
   const instance2 = await createWsFastifyInstance(config2);
 
-  // create "test" channel locally on both
-  instance1.websocketChannels!.channelCreate('test', false);
-  instance2.websocketChannels!.channelCreate('test', false);
+  // register same topic on both instances
+  instance1.websockets?.register('foo', async (req) => {
+    /* don't reject */
+  });
+  instance2.websockets?.register('foo', async (req) => {
+    /* don't reject */
+  });
 
   const client1 = await createWsClient(config1);
   const client2 = await createWsClient(config2);
@@ -50,20 +42,20 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   // subscribe each client to a respective broker instance on channel "test"
   const ack1 = clientWait(client1, 1);
   const ack2 = clientWait(client2, 1);
-  const req: ClientMessage = {
-    realm: WS_REALM_NOTIF,
-    action: WS_CLIENT_ACTION_SUBSCRIBE,
+  const req: ClientSubscribe = {
+    realm: 'notif',
+    action: 'subscribe',
     channel: 'test',
-    entity: WS_ENTITY_ITEM,
+    topic: 'foo',
   };
   clientSend(client1, req);
   clientSend(client2, req);
   const ack1Msg = await ack1;
   const ack2Msg = await ack2;
   const expected = {
-    realm: WS_REALM_NOTIF,
-    type: WS_SERVER_TYPE_RESPONSE,
-    status: WS_RESPONSE_STATUS_SUCCESS,
+    realm: 'notif',
+    type: 'response',
+    status: 'success',
     request: req,
   };
   expect(ack1Msg).toStrictEqual(expected);
@@ -72,34 +64,36 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   // broker dispatch should be received by both clients
   const test1 = clientWait(client1, 1);
   const test2 = clientWait(client2, 1);
-  instance1.websocketChannelsBroker!.dispatch('test', {
-    realm: WS_REALM_NOTIF,
-    type: WS_SERVER_TYPE_INFO,
-    message: 'hello',
-  });
+  const msg = {
+    hello: 'world',
+  };
+  instance1.websockets?.publish('foo', 'test', msg);
   const values = await Promise.all([test1, test2]);
   values.forEach((value) => {
     expect(value).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_INFO,
-      message: 'hello',
+      realm: 'notif',
+      type: 'update',
+      topic: 'foo',
+      channel: 'test',
+      body: msg,
     });
   });
 
   // broker broadcast should be received by both clients
   const b1 = clientWait(client1, 1);
   const b2 = clientWait(client2, 1);
-  instance2.websocketChannelsBroker!.dispatch('broadcast', {
-    realm: WS_REALM_NOTIF,
-    type: WS_SERVER_TYPE_INFO,
-    message: 'broadcast',
-  });
+  const broadcast = {
+    baz: 42,
+  };
+  instance2.websockets?.publish('foo', 'broadcast', broadcast);
   const values2 = await Promise.all([b1, b2]);
   values2.forEach((value) => {
     expect(value).toStrictEqual({
-      realm: WS_REALM_NOTIF,
-      type: WS_SERVER_TYPE_INFO,
-      message: 'broadcast',
+      realm: 'notif',
+      type: 'update',
+      topic: 'foo',
+      channel: 'broadcast',
+      body: broadcast,
     });
   });
 
@@ -109,7 +103,7 @@ test('Message sent on a multi-instance broker is received by all instances', asy
   await instance2.close();
 });
 
-test('Message with incorrect format received from Redis triggers log', async () => {
+test('incorrect Redis message format', async () => {
   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const logger = createMockFastifyLogger();
   const logInfoSpy = jest.spyOn(logger, 'info');

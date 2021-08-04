@@ -2,37 +2,25 @@
  * graasp-websockets
  *
  * Test utility functions and configuration
- *
- * @author Alexandre CHAU
  */
 
 import fastify, { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
 import WebSocket from 'ws';
-import { AjvMessageSerializer } from '../src/impls/ajv-message-serializer';
+import graaspWebSockets from '../src';
+import { AjvMessageSerializer } from '../src/impls/message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';
-import { MessageSerializer } from '../src/interfaces/message-serializer';
-import graaspWebSockets from '../src/service-api';
 import { WebSocketChannels } from '../src/ws-channels';
-import {
-  mockChatManager,
-  mockDatabase,
-  mockItemMembershipsManager,
-  mockItemsManager,
-  mockSessionPreHandler,
-  mockTaskRunner,
-  mockValidateSession,
-} from './mocks';
+import { mockSessionPreHandler, mockValidateSession } from './mocks';
 
 const clientSerdes = { serialize: JSON.stringify, parse: JSON.parse };
-const serverSerdes: MessageSerializer<ClientMessage, ServerMessage> =
-  new AjvMessageSerializer();
+const serverSerdes = new AjvMessageSerializer();
 
 /**
  * Test config type
  * Specifies server configuration for test run
  */
-interface TestConfig {
+export interface TestConfig {
   host: string;
   port: number;
   prefix?: string;
@@ -46,7 +34,7 @@ interface TestConfig {
  * Creates a default local config for tests with 127.0.0.1 host and /ws prefix
  * @param options server configuration
  */
-function createDefaultLocalConfig(options: { port: number }): TestConfig {
+export function createDefaultLocalConfig(options: { port: number }): TestConfig {
   return {
     host: '127.0.0.1',
     port: options.port,
@@ -57,7 +45,7 @@ function createDefaultLocalConfig(options: { port: number }): TestConfig {
 /**
  * Utility class to generate new port numbers
  */
-class PortGenerator {
+export class PortGenerator {
   port: number;
 
   constructor(initPort: number) {
@@ -76,17 +64,17 @@ class PortGenerator {
  * @param heartbeatInterval heartbeat time interval to check keepalive connections, MUST be an order of magnitude higher than a network message roundtrip
  * @returns Object containing channels server and underlying ws server
  */
-function createWsChannels(
+export function createWsChannels(
   config: TestConfig,
   heartbeatInterval: number = 30000,
 ): {
-  channels: WebSocketChannels<ClientMessage, ServerMessage>;
+  channels: WebSocketChannels;
   wss: WebSocket.Server;
 } {
   const server = new WebSocket.Server({ port: config.port });
   const wsChannels = new WebSocketChannels(
     server,
-    serverSerdes,
+    serverSerdes.serialize,
     console,
     heartbeatInterval,
   );
@@ -106,31 +94,30 @@ function createWsChannels(
 }
 
 /**
+ * In test mode, websocket channels are available
+ */
+declare module 'fastify' {
+  interface FastifyInstance {
+    _debug_websocketsChannels: WebSocketChannels;
+  }
+}
+
+/**
  * Creates a barebone fastify server
  * @param config TestConfig for this server
  * @param setupFn a setup function applied to the fastify instance before starting the server
  * @returns Promise of fastify server instance
  */
-async function createFastifyInstance(
+export async function createFastifyInstance(
   config: TestConfig,
   setupFn: (instance: FastifyInstance) => Promise<void> = (_) =>
     Promise.resolve(),
 ): Promise<FastifyInstance> {
   const promise = new Promise<FastifyInstance>((resolve, reject) => {
-    const server = fastify(/*{ logger: true }*/);
-
-    server.items = mockItemsManager;
-
-    server.itemMemberships = mockItemMembershipsManager;
-
-    server.taskRunner = mockTaskRunner;
+    const server = fastify({ logger: true });
 
     server.validateSession = mockValidateSession;
     server.addHook('preHandler', mockSessionPreHandler);
-
-    server.db = mockDatabase;
-
-    server.chat = mockChatManager;
 
     setupFn(server).then(() => {
       server.listen(config.port, config.host, (err, addr) => {
@@ -150,7 +137,7 @@ async function createFastifyInstance(
  * @param config TestConfig for this server
  * @returns Promise of fastify server instance with graasp-websockets plugin
  */
-async function createWsFastifyInstance(
+export async function createWsFastifyInstance(
   config: TestConfig,
   setupFn: (instance: FastifyInstance) => Promise<void> = (_) =>
     Promise.resolve(),
@@ -168,7 +155,7 @@ async function createWsFastifyInstance(
  * a host, port and prefix config
  * @param config TestConfig for this server
  */
-function createConnUrl(config: TestConfig): string {
+export function createConnUrl(config: TestConfig): string {
   return `ws://${config.host}:${config.port}${config.prefix ?? '/ws'}`;
 }
 
@@ -177,7 +164,7 @@ function createConnUrl(config: TestConfig): string {
  * @param config TestConfig for this server
  * @returns Promise of websocket client
  */
-async function createWsClient(config: TestConfig): Promise<WebSocket> {
+export async function createWsClient(config: TestConfig): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const client = new WebSocket(createConnUrl(config));
     client.on('open', () => resolve(client));
@@ -190,7 +177,7 @@ async function createWsClient(config: TestConfig): Promise<WebSocket> {
  * @param numberClients Number of websocket clients to spawn
  * @returns Promise of Array of N websocket clients
  */
-async function createWsClients(
+export async function createWsClients(
   config: TestConfig,
   numberClients: number,
 ): Promise<Array<WebSocket>> {
@@ -206,7 +193,7 @@ async function createWsClients(
  * @param numberMessages Number of messages to wait for
  * @returns Received message if numberMessages == 1, else array of received messages
  */
-async function clientWait(
+export async function clientWait(
   client: WebSocket,
   numberMessages: number,
 ): Promise<ServerMessage | Array<ServerMessage>> {
@@ -267,7 +254,7 @@ async function clientWait(
  * @param numberMessages Number of messages to wait for
  * @returns Array containing the received message or array of received messages for each client
  */
-async function clientsWait(
+export async function clientsWait(
   clients: Array<WebSocket>,
   numberMessages: number,
 ): Promise<Array<ServerMessage | Array<ServerMessage>>> {
@@ -281,21 +268,28 @@ async function clientsWait(
  * @param client WebSocket client to send from
  * @param data ClientMessage to be sent
  */
-function clientSend(client: WebSocket, data: ClientMessage): void {
+export function clientSend(client: WebSocket, data: ClientMessage): void {
   client.send(clientSerdes.serialize(data));
 }
 
-export {
-  TestConfig,
-  PortGenerator,
-  createConnUrl,
-  createDefaultLocalConfig,
-  createWsChannels,
-  createWsClient,
-  createWsClients,
-  createFastifyInstance,
-  createWsFastifyInstance,
-  clientWait,
-  clientsWait,
-  clientSend,
-};
+/**
+ * Expects a subscription to a given channel
+ * @param client
+ * @param channel
+ */
+export async function expectClientSubscribe(client: WebSocket, topic: string, channel: string): Promise<void> {
+  const ack = clientWait(client, 1);
+  const req: ClientMessage = {
+    realm: 'notif',
+    action: 'subscribe',
+    topic,
+    channel
+  };
+  clientSend(client, req);
+  return expect(await ack).toStrictEqual({
+    realm: 'notif',
+    type: 'response',
+    status: 'success',
+    req,
+  });
+}
