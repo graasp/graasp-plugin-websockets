@@ -6,9 +6,7 @@ You may want to add real-time interactions with the Graasp core server in your f
 
 If your front-end application is written in [React](https://reactjs.org/) and uses [React Query](https://react-query.tanstack.com/) to synchronize with server state, then the [graasp-query-client](https://github.com/graasp/graasp-query-client) repository already implements [hooks](https://reactjs.org/docs/hooks-intro.html) that can be readily called in your functional components.
 
-Usually, you will combine a hook to query your data on the server core with another hook dedicated to receiving updates through a websocket channel.
-
-The list of query hooks is available at [`graasp-query-client/src/hooks`](https://github.com/graasp/graasp-query-client/tree/main/src/hooks), while the list of websocket hooks is available here: [`graasp-query-client/src/ws/hooks.ts`](https://github.com/graasp/graasp-query-client/blob/main/src/ws/hooks.ts).
+The list of query hooks is available at [`graasp-query-client/src/hooks`](https://github.com/graasp/graasp-query-client/tree/main/src/hooks).
 
 ### Example
 
@@ -51,29 +49,10 @@ const FolderView = ({ folderId }) => {
 };
 ```
 
-The `useChildren` hook will take care of re-rendering the component by itself when `data` is actually available.
+The `useChildren` hook will take care of re-rendering the component by itself when `data` is actually available. It will also take care of subscribing to the corresponding websocket channel, and updating the respective internal state (which will automatically trigger a re-render of the view with the updated data). You can opt out of websocket updates by passing the `getUpdates: false` option (this may be useful when you don't want to receive updates, e.g. content editors):
 
-Now subscribe to children item updates by importing the `ws` object and calling `useChildrenUpdates` of its `hooks` property. With this hook, the view will automatically re-render to display these updates (as the query client will be mutated, which in turn causes a re-render).
-
-```jsx
-import { hooks, ws } from '@graasp/query-client'; // <- import ws
-
-const FolderView = ({ folderId }) => {
-  const { data, isLoading } = hooks.useChildren(folderId);
-  ws.hooks.useChildrenUpdates(folderId); // <- add this line
-
-  if (isLoading) {
-    return <div>Loading children...</div>;
-  }
-
-  return (
-    <div>
-      {data.map((item) => (
-        <a>{item.name}</a>
-      ))}
-    </div>
-  );
-};
+```ts
+const { data, isLoading } = hooks.useChildren(folderId, { getUpdates: false });
 ```
 
 That's it!
@@ -182,7 +161,7 @@ Once your back-end implementation is ready, you can write the client code to con
 
 The repository implements a [custom WebSocket client](https://github.com/graasp/graasp-query-client/blob/main/src/ws/ws-client.ts), which takes care of communicating with the server plugin using the Graasp websocket protocol defined at [`API.md`](API.md).
 
-To add your own hooks, modify the [`src/ws/hooks.ts`](https://github.com/graasp/graasp-query-client/blob/main/src/ws/hooks.ts) file.
+To add your own hooks, modify the [`src/ws/hooks`](https://github.com/graasp/graasp-query-client/blob/main/src/ws/hooks) files.
 
 In this example, we allow components to subscribe to the `bar` event on the `baz` topic. `bazId` is provided by the consumer component (e.g. when accessing the view of this `baz` object instance).
 
@@ -197,7 +176,7 @@ useBarUpdates: (bazId: UUID) => {
       return;
     }
 
-    const channel: Channel = { name: userId, entity: 'baz' };
+    const channel: Channel = { name: userId, topic: 'baz' };
 
     const handler = (data: any) => {
       // here you can perform your specific front-end application action
@@ -212,6 +191,52 @@ useBarUpdates: (bazId: UUID) => {
       websocketClient.unsubscribe(channel, handler);
     };
   }, [bazId]);
+};
+```
+
+You will usually integrate your websocket hook inside an API call hook of the same name. For instance, assume we already fetch the `bar` data with hook `useBar(bazId)` defined as follow:
+
+```ts
+useBar: (bazId: UUID) => useQuery(
+    ...
+  );
+```
+
+You can combine the websocket hook call first and return the query hook. Configure your respective websocket hooks at the top of the file, and then modify the implementation as follows:
+
+```ts
+import { configureWsBarHooks } from '../ws';
+
+const { enableWebsocket } = queryConfig;
+
+const barWsHooks =
+  enableWebsocket && websocketClient // required to type-check non-null
+    ? configureWsBarHooks(queryClient, websocketClient)
+    : undefined;
+
+useBar: (bazId: UUID, options?: { getUpdates?: boolean }) => {
+  const getUpdates = options?.getUpdates ?? enableWebsocket;
+
+  barWsHooks?.useBarUpdates(getUpdates ? bazId : null);
+
+  return useQuery(
+    ...
+  );
+};
+```
+
+If your API hook already accepts an option similar to `enabled`, don't forget to combine it in the condition:
+
+```ts
+useBar: (bazId: UUID, options?: { enabled?: boolean, getUpdates?: boolean }) => {
+  const enabled = options?.enabled ?? true;
+  const getUpdates = options?.getUpdates ?? enableWebsocket;
+
+  barWsHooks?.useBarUpdates(enabled && getUpdates ? bazId : null);
+
+  return useQuery(
+    ...
+  );
 };
 ```
 
