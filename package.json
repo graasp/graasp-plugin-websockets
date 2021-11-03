@@ -39,7 +39,7 @@
     "ioredis": "^4.27.6"
   },
   "devDependencies": {
-    "@types/graasp": "git://github.com/graasp/graasp-types.git",
+    "@types/graasp": "github:graasp/graasp-types",
     "@types/ioredis": "^4.26.4",
     "@types/jest": "^26.0.23",
     "@types/ws": "^7.4.5",
