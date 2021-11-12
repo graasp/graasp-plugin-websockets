@@ -4,3 +4,11 @@ dist/
 node_modules/
 # coverage
 coverage/
+
+# yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
