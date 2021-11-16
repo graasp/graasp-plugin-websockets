@@ -6,11 +6,11 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "prepare": "npm run build",
-    "prepack": "npm run build",
+    "prepare": "yarn build",
+    "prepack": "yarn build",
     "clean": "npx shx rm -rf dist/ coverage/",
     "lint": "npx eslint . --ext .js,.jsx,.ts,.tsx",
-    "test": "npm run build && npx jest",
+    "test": "yarn build && npx jest",
     "test:ci": "npx jest --ci --colors"
   },
   "repository": {
