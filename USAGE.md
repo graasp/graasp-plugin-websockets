@@ -23,7 +23,7 @@ First install the `graasp-query-client` dependency in your package.json:
 
 ```
 
-And then run `npm install` (or `yarn install` depending on your package manager).
+And then run `yarn install` (or `npm install` depending on your package manager).
 
 Make sure to provide the query client somewhere near the top of your components tree ([docs](https://react-query.tanstack.com/reference/QueryClientProvider)).
 

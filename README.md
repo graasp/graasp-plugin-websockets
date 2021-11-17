@@ -90,13 +90,13 @@ cd graasp-websockets
 Install the dependencies:
 
 ```
-npm install
+yarn install
 ```
 
 Compile the code:
 
 ```
-npm run build
+yarn build
 ```
 
 Files are compiled into the `dist/` folder.
@@ -108,7 +108,7 @@ You can then run tests as described [below](#testing), or import parts of the im
 You can clean compiled and generated files from the repository folder using:
 
 ```
-npm run clean
+yarn clean
 ```
 
 ## Testing
@@ -118,13 +118,13 @@ Several test suites are provided in folder [`test/`](test/). They include unit t
 To run the tests, make sure that you have installed the dependencies at least once:
 
 ```
-npm install
+yarn install
 ```
 
 Then simply use the `test` script (defined in [`package.json`](package.json)):
 
 ```
-npm run test
+yarn test
 ```
 
 You will obtain the Jest summary in the console.
@@ -148,7 +148,7 @@ Code quality is enforced using [ESLint](https://eslint.org/) and its configurati
 To see a list of lint issues found in the code, run:
 
 ```
-npm run lint
+yarn lint
 ```
 
 ### Continuous integration
@@ -157,7 +157,7 @@ This repository also includes a run configuration for Github Actions in [`.githu
 
 #### Troubleshooting
 
-If your project depends on `graasp-websockets`, cannot fetch the `graasp-websockets` repository in your continuous integration system (such as Github Actions) and uses `npm ci` as the install command, try using `npm install` instead. There are known issues with Github SSH keys management.
+If your project depends on `graasp-websockets`, cannot fetch the `graasp-websockets` repository in your continuous integration system (such as Github Actions) and uses `yarn ci` as the install command, try using `yarn install` instead. There are known issues with Github SSH keys management.
 
 ## Repository structure
 
