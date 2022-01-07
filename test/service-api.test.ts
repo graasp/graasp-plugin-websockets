@@ -140,7 +140,8 @@ describe('internal state', () => {
       });
       // eslint-disable-next-line jest/no-standalone-expect
       expect(
-        t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers.size,
+        t.server!._debug_websocketsChannels.channels.get('foo/a')?.subscribers
+          .size,
       ).toEqual(1);
     });
 
