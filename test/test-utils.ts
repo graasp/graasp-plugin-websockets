@@ -34,7 +34,9 @@ export interface TestConfig {
  * Creates a default local config for tests with 127.0.0.1 host and /ws prefix
  * @param options server configuration
  */
-export function createDefaultLocalConfig(options: { port: number }): TestConfig {
+export function createDefaultLocalConfig(options: {
+  port: number;
+}): TestConfig {
   return {
     host: '127.0.0.1',
     port: options.port,
@@ -277,13 +279,17 @@ export function clientSend(client: WebSocket, data: ClientMessage): void {
  * @param client
  * @param channel
  */
-export async function expectClientSubscribe(client: WebSocket, topic: string, channel: string): Promise<void> {
+export async function expectClientSubscribe(
+  client: WebSocket,
+  topic: string,
+  channel: string,
+): Promise<void> {
   const ack = clientWait(client, 1);
   const req: ClientMessage = {
     realm: 'notif',
     action: 'subscribe',
     topic,
-    channel
+    channel,
   };
   clientSend(client, req);
   return expect(await ack).toStrictEqual({
