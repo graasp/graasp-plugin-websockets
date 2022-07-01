@@ -3,13 +3,13 @@
  *
  * Tests for fastify
  */
-
 import fws from 'fastify-websocket';
+
 import {
+  PortGenerator,
   createDefaultLocalConfig,
   createFastifyInstance,
   createWsClient,
-  PortGenerator,
 } from './test-utils';
 
 const portGen = new PortGenerator(3000);

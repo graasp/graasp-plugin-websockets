@@ -1,4 +1,5 @@
 import { Member, UnknownExtra } from 'graasp';
+
 import { Error } from './error';
 
 /**

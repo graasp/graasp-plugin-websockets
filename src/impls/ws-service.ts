@@ -1,5 +1,7 @@
-import { Member, UnknownExtra } from 'graasp';
 import WebSocket from 'ws';
+
+import { Member, UnknownExtra } from 'graasp';
+
 import {
   CLIENT_ACTION_DISCONNECT,
   CLIENT_ACTION_SUBSCRIBE,
@@ -9,9 +11,9 @@ import {
 import {
   BadRequest,
   Error,
-  isError as isSubscriptionError,
   NotFound,
   ServerError,
+  isError as isSubscriptionError,
 } from '../interfaces/error';
 import { Logger } from '../interfaces/logger';
 import {
@@ -19,10 +21,10 @@ import {
   ClientSubscribe,
   ClientSubscribeOnly,
   ClientUnsubscribe,
+  ServerMessage,
   createServerErrorResponse,
   createServerSuccessResponse,
   createServerUpdate,
-  ServerMessage,
 } from '../interfaces/message';
 import { SubscriptionRequest } from '../interfaces/request';
 import { WebSocketService } from '../interfaces/ws-service';

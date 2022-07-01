@@ -1,4 +1,5 @@
 import { JTDSchemaType } from 'ajv/dist/jtd';
+
 import { Error } from '../interfaces/error';
 
 /**

@@ -6,12 +6,13 @@
  * Integrates the {@link WebSocketChannels} abstraction
  * in a fastify server plugin with fastify-websocket
  */
+import Redis from 'ioredis';
+import util from 'util';
 
 import { FastifyLoggerInstance, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 import fws from 'fastify-websocket';
-import Redis from 'ioredis';
-import util from 'util';
+
 import config from './config';
 import { AjvMessageSerializer } from './impls/message-serializer';
 import { Service } from './impls/ws-service';

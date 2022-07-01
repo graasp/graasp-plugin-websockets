@@ -1,4 +1,5 @@
 import { JTDSchemaType } from 'ajv/dist/jtd';
+
 import { ClientMessage, ServerMessage } from '../interfaces/message';
 import { errorSchema } from './error';
 

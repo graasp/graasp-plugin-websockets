@@ -6,6 +6,7 @@
  * @author Alexandre CHAU
  */
 import WebSocket from 'ws';
+
 import { Logger } from './interfaces/logger';
 import { ServerMessage } from './interfaces/message';
 
