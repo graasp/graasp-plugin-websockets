@@ -1,5 +1,7 @@
-import { Member, UnknownExtra } from 'graasp';
 import WebSocket from 'ws';
+
+import { Member, UnknownExtra } from 'graasp';
+
 import {
   CLIENT_ACTION_DISCONNECT,
   CLIENT_ACTION_SUBSCRIBE,
@@ -9,9 +11,9 @@ import {
 import {
   BadRequest,
   Error,
-  isError as isSubscriptionError,
   NotFound,
   ServerError,
+  isError as isSubscriptionError,
 } from '../interfaces/error';
 import { Logger } from '../interfaces/logger';
 import {
@@ -19,10 +21,10 @@ import {
   ClientSubscribe,
   ClientSubscribeOnly,
   ClientUnsubscribe,
+  ServerMessage,
   createServerErrorResponse,
   createServerSuccessResponse,
   createServerUpdate,
-  ServerMessage,
 } from '../interfaces/message';
 import { SubscriptionRequest } from '../interfaces/request';
 import { WebSocketService } from '../interfaces/ws-service';
@@ -86,6 +88,9 @@ export class Service implements WebSocketService {
 
     const validate = this.validators.get(request.topic);
     if (validate === undefined) {
+      this.logger.info(
+        `graasp-websockets: Validator not found for topic ${request.topic}`,
+      );
       res = createServerErrorResponse(NotFound(), request);
     } else {
       try {
@@ -157,6 +162,9 @@ export class Service implements WebSocketService {
 
     // validation error, send bad request
     if (request === undefined) {
+      this.logger.info(
+        `graasp-websockets: Bad client request (memberID: ${member.id}, message: ${data})`,
+      );
       const err = BadRequest();
       this.wsChannels.clientSend(client, createServerErrorResponse(err));
       return;
@@ -189,6 +197,9 @@ export class Service implements WebSocketService {
 
   register(topic: string, validateClient: ValidationFn): this {
     if (this.validators.has(topic)) {
+      this.logger.error(
+        `graasp-websockets: Topic ${topic} is already registered`,
+      );
       throw new Error('WebSocketService.register: topic already exists!');
     }
     this.validators.set(topic, validateClient);

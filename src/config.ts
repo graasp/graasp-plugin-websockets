@@ -3,7 +3,6 @@
  *
  * Local configuration for graasp-websockets plugin
  */
-
 import dotenv from 'dotenv';
 
 // Load environment variables

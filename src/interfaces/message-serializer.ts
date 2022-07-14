@@ -5,8 +5,8 @@
  * operations between the WebSocket.Data messages exchanged on the
  * network and the data types used in the {@link WebSocketChannels}
  */
-
 import WebSocket from 'ws';
+
 import { ClientMessage, ServerMessage } from './message';
 
 interface MessageSerializer {

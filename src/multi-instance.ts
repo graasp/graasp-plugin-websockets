@@ -7,10 +7,10 @@
  * ! In this file, we distinguish WS channels (part of the {@link WebSocketChannels} abstraction)
  * and Redis channels (from the Redis Pub/Sub mechanism which handles inter-instance communication) !
  */
-
 import { JTDSchemaType } from 'ajv/dist/core';
 import Ajv from 'ajv/dist/jtd';
 import Redis from 'ioredis';
+
 import { REALM_NOTIF } from './interfaces/constants';
 import { Logger } from './interfaces/logger';
 import { ServerMessage } from './interfaces/message';

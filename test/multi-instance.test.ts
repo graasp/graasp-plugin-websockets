@@ -3,19 +3,19 @@
  *
  * Tests for {@link MultiInstanceChannelsBroker}
  */
-
 import Redis from 'ioredis';
 import waitForExpect from 'wait-for-expect';
+
 import globalConfig from '../src/config';
 import { ClientSubscribe } from '../src/interfaces/message';
 import { createMockFastifyLogger } from './mocks';
 import {
+  PortGenerator,
   clientSend,
   clientWait,
   createDefaultLocalConfig,
   createWsClient,
   createWsFastifyInstance,
-  PortGenerator,
 } from './test-utils';
 
 const portGen = new PortGenerator(5000);

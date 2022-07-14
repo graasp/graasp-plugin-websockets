@@ -3,10 +3,11 @@
  *
  * Test utility functions and configuration
  */
-
-import fastify, { FastifyInstance } from 'fastify';
 import Redis from 'ioredis';
 import WebSocket from 'ws';
+
+import fastify, { FastifyInstance } from 'fastify';
+
 import graaspWebSockets from '../src';
 import { AjvMessageSerializer } from '../src/impls/message-serializer';
 import { ClientMessage, ServerMessage } from '../src/interfaces/message';

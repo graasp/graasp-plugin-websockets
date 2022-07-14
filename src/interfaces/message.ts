@@ -4,7 +4,6 @@
  * Message interface that describe the shape of messages
  * in the Graasp websocket protocol
  */
-
 import {
   CLIENT_ACTION_DISCONNECT,
   CLIENT_ACTION_SUBSCRIBE,

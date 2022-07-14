@@ -6,6 +6,7 @@
  * @author Alexandre CHAU
  */
 import WebSocket from 'ws';
+
 import { Logger } from './interfaces/logger';
 import { ServerMessage } from './interfaces/message';
 
@@ -84,6 +85,8 @@ class WebSocketChannels {
   serialize: (data: ServerMessage) => WebSocket.Data;
   // Heartbeat interval instance
   heartbeat: NodeJS.Timeout;
+  // Logging interface
+  logger: Logger;
 
   /**
    * Creates a new WebSocketChannels instance
@@ -103,6 +106,7 @@ class WebSocketChannels {
     this.channels = new Map();
     this.subscriptions = new Map();
     this.serialize = serialize;
+    this.logger = log;
 
     // checks lost connections every defined time interval
     this.heartbeat = setInterval(() => {
@@ -156,6 +160,9 @@ class WebSocketChannels {
    */
   clientSend(client: WebSocket, message: ServerMessage): boolean {
     if (client.readyState !== WebSocket.OPEN) {
+      this.logger.info(
+        `graasp-websockets: attempted to send message to client that was not ready (${message})`,
+      );
       return false;
     } else {
       client.send(this.serialize(message));

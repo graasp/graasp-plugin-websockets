@@ -5,18 +5,19 @@
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import waitForExpect from 'wait-for-expect';
 import WebSocket, { CLOSED, OPEN } from 'ws';
+
 import { createServerInfo } from '../src/interfaces/message';
 import {
+  PortGenerator,
   createConnUrl,
   createDefaultLocalConfig,
   createWsChannels,
   createWsClient,
   createWsClients,
-  PortGenerator,
 } from './test-utils';
 
 const portGen = new PortGenerator(4000);

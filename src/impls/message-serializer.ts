@@ -5,6 +5,7 @@
  *  https://ajv.js.org/guide/typescript.html
  */
 import Ajv from 'ajv/dist/jtd';
+
 import { ClientMessage, ServerMessage } from '../interfaces/message';
 import { MessageSerializer } from '../interfaces/message-serializer';
 import { clientMessageSchema, serverMessageSchema } from '../schemas';

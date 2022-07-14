@@ -5,23 +5,24 @@
  */
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-
-import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
 import waitForExpect from 'wait-for-expect';
 import WebSocket from 'ws';
+
+import { FastifyInstance, FastifyLoggerInstance } from 'fastify';
+
 import { AccessDenied } from '../src';
 import { ClientMessage, createServerInfo } from '../src/interfaces/message';
 import { createMockFastifyLogger } from './mocks';
 import {
+  PortGenerator,
+  TestConfig,
   clientSend,
-  clientsWait,
   clientWait,
+  clientsWait,
   createDefaultLocalConfig,
   createWsClient,
   createWsClients,
   createWsFastifyInstance,
-  PortGenerator,
-  TestConfig,
 } from './test-utils';
 
 const portGen = new PortGenerator(7000);
