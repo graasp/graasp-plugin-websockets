@@ -1,4 +1,4 @@
-import { Member, UnknownExtra } from 'graasp';
+import { Member, UnknownExtra } from '@graasp/sdk';
 
 import { Error } from './error';
 
