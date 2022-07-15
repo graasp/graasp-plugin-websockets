@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 
-import { Member, UnknownExtra } from 'graasp';
+import { Member, UnknownExtra } from '@graasp/sdk';
 
 import {
   CLIENT_ACTION_DISCONNECT,
