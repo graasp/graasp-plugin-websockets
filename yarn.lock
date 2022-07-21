@@ -732,9 +732,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@graasp/sdk@github:graasp/graasp-utils#15/testUtils":
+"@graasp/sdk@github:graasp/graasp-sdk":
   version: 0.1.0
-  resolution: "@graasp/sdk@https://github.com/graasp/graasp-utils.git#commit=661117d8b5116b7ebfe39e43f39f3c8eb65b3e7c"
+  resolution: "@graasp/sdk@https://github.com/graasp/graasp-sdk.git#commit=513b28bc7081aca26ab55088eb12618f51eff922"
   dependencies:
     "@fastify/secure-session": 5.2.0
     aws-sdk: 2.1111.0
@@ -744,7 +744,7 @@ __metadata:
     qs: 6.11.0
     slonik: 28.1.1
     uuid: 8.3.2
-  checksum: 667b0eea9bfaf14ffeae3b27a7eebfdc3b566362f5655fdd089551bd40bb797d4496968acea04f19e044f242170afd2d7698a1037bbca42c8f3af2c26e802955
+  checksum: b8e2d75f7a35aa3550bcf54aa998e5bb1738447095b4ee26102cf354e748399532ac4518f22a64c2f11d6cba82196dca3cace4256d16fafee0c548885f818193
   languageName: node
   linkType: hard
 
@@ -3715,7 +3715,7 @@ __metadata:
   dependencies:
     "@commitlint/cli": 16.3.0
     "@commitlint/config-conventional": 16.2.4
-    "@graasp/sdk": "github:graasp/graasp-utils#15/testUtils"
+    "@graasp/sdk": "github:graasp/graasp-sdk"
     "@trivago/prettier-plugin-sort-imports": 3.2.0
     "@types/ioredis": ^4.28.10
     "@types/jest": ^26.0.24
