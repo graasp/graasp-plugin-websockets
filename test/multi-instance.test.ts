@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Tests for {@link MultiInstanceChannelsBroker}
  */
@@ -121,7 +121,7 @@ test('incorrect Redis message format', async () => {
   );
   await waitForExpect(() => {
     expect(logInfoSpy).toHaveBeenCalledWith(
-      `graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${globalConfig.redis.notifChannel}": "Mock invalid redis message"`,
+      `graasp-plugin-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${globalConfig.redis.notifChannel}": "Mock invalid redis message"`,
     );
   });
   pub.disconnect();

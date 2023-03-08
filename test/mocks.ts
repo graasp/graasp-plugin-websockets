@@ -1,7 +1,7 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
- * Mock instances for testing in graasp-websockets
+ * Mock instances for testing in graasp-plugin-websockets
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

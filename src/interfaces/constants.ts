@@ -1,5 +1,5 @@
 /**
- * Reusable constants for graasp-websockets
+ * Reusable constants for graasp-plugin-websockets
  */
 
 /** Namespace for notifications realm */

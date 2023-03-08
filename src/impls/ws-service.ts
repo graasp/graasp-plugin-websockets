@@ -89,7 +89,7 @@ export class Service implements WebSocketService {
     const validate = this.validators.get(request.topic);
     if (validate === undefined) {
       this.logger.info(
-        `graasp-websockets: Validator not found for topic ${request.topic}`,
+        `graasp-plugin-websockets: Validator not found for topic ${request.topic}`,
       );
       res = createServerErrorResponse(NotFound(), request);
     } else {
@@ -121,7 +121,7 @@ export class Service implements WebSocketService {
         } else {
           // something else went wrong, log and wrap
           this.logger.error(
-            `graasp-websockets: unexpected validation error: ${error}`,
+            `graasp-plugin-websockets: unexpected validation error: ${error}`,
           );
           const err = ServerError('unexpected validation error');
           res = createServerErrorResponse(err, request);
@@ -163,7 +163,7 @@ export class Service implements WebSocketService {
     // validation error, send bad request
     if (request === undefined) {
       this.logger.info(
-        `graasp-websockets: Bad client request (memberID: ${member.id}, message: ${data})`,
+        `graasp-plugin-websockets: Bad client request (memberID: ${member.id}, message: ${data})`,
       );
       const err = BadRequest();
       this.wsChannels.clientSend(client, createServerErrorResponse(err));
@@ -198,7 +198,7 @@ export class Service implements WebSocketService {
   register(topic: string, validateClient: ValidationFn): this {
     if (this.validators.has(topic)) {
       this.logger.error(
-        `graasp-websockets: Topic ${topic} is already registered`,
+        `graasp-plugin-websockets: Topic ${topic} is already registered`,
       );
       throw new Error('WebSocketService.register: topic already exists!');
     }

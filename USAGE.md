@@ -1,6 +1,6 @@
 # Adding real-time behaviour in Graasp applications
 
-You may want to add real-time interactions with the Graasp core server in your front-end application, or extend the real-time capabilities of the server in your own server code (such as other plugins). This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-websockets` plugin. For server-side registration of the plugin, see [README.md](README.md).
+You may want to add real-time interactions with the Graasp core server in your front-end application, or extend the real-time capabilities of the server in your own server code (such as other plugins). This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-plugin-websockets` plugin. For server-side registration of the plugin, see [README.md](README.md).
 
 ## Exploring and using ready-to-use React hooks
 
@@ -57,7 +57,7 @@ const { data, isLoading } = hooks.useChildren(folderId, { getUpdates: false });
 
 That's it!
 
-## Consuming the `graasp-websockets` plugin to extend real-time capabilities
+## Consuming the `graasp-plugin-websockets` plugin to extend real-time capabilities
 
 The existing hooks may not provide the functionality required by your application. This section will describe how to extend the capabilities of the server as well as of the query client.
 
@@ -69,14 +69,12 @@ You can register additional websocket messages using the `websockets` service de
 
 Add the dependency in your `package.json` which is required to correctly load the types and augmentations:
 
-```jsonc
-  "dependencies": {
-      ...
-      "graasp-websockets": "git://github.com/graasp/graasp-websockets.git#master",
-  },
+```sh
+  # if you use npm
+  npm install @graasp/sdk @graasp/plugin-websockets
+  # if you use yarn
+  yarn add @graasp/sdk @graasp/plugin-websockets
 ```
-
-and then run `npm install` (or `yarn install` depending on your package manager)
 
 Then, destructure the service from the Fastify server:
 
@@ -87,36 +85,12 @@ const plugin = async (fastify, options) => {
 };
 ```
 
-> If you use Typescript to consume the plugin, the compiler may complain that the `websockets` property cannot be found:
->
-> ```
-> Property 'websockets' does not exist on type 'FastifyInstance<Server, IncomingMessage, ServerResponse, FastifyLoggerInstance>'.
-> ```
->
-> This is caused by the `fastify` module augmentation defined at [src/index.ts](src/index.ts) not being discovered by the compiler. As a workaround, redeclare the module augmentation with the corresponding property:
->
-> ```ts
-> // hack to force compiler to discover websockets service
-> declare module 'fastify' {
->   interface FastifyInstance {
->     websockets?: WebSocketService;
->   }
-> }
->
-> const plugin = async (fastify, options) => {
->   // 'websockets' should now be available on 'fastify'
->   const { websockets } = fastify;
-> };
-> ```
->
-> See https://github.com/graasp/graasp-websockets/issues/19
-
 The `websockets` service exposes the following API: [see `WebSocketService`](src/interfaces/ws-service.ts).
 
 Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`Error`](src/interfaces/error.ts). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
 
 ```ts
-import { NotFound, AccessDenied } from 'graasp-websockets';
+import { AccessDenied, NotFound } from 'graasp-plugin-websockets';
 
 // register a topic called 'foo'
 websockets.register('foo', async (request) => {

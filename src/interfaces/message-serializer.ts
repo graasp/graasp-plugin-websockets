@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Serdes interface that describes serialization / deserialization
  * operations between the WebSocket.Data messages exchanged on the

@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Tests for {@link WebSocketChannels}
  */

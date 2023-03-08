@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Tests for {@link service-api.ts}
  */
@@ -37,8 +37,7 @@ describe('plugin options', () => {
         config: {
           host: '127.0.0.1',
           port: 6379,
-          username: 'default',
-          password: 'redis-password',
+          password: 'redis-pass',
         },
         channelName: 'redis-channel-name',
       },
@@ -53,7 +52,7 @@ describe('plugin options', () => {
     await waitForExpect(() => {
       // password should not be logged
       expect(logInfoSpy).toHaveBeenCalledWith(
-        "graasp-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'default' }, notifChannel: 'redis-channel-name' }",
+        "graasp-plugin-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'default' }, notifChannel: 'redis-channel-name' }",
       );
     });
 
@@ -536,7 +535,7 @@ describe('error cases', () => {
 
     await waitForExpect(() => {
       expect(logErrorSpy).toHaveBeenCalledWith(
-        'graasp-websockets: an error occured: Error: Mock server error\n\tDestroying connection',
+        'graasp-plugin-websockets: an error occured: Error: Mock server error\n\tDestroying connection',
       );
     });
 

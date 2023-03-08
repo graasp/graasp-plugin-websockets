@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Multi-instance broker for WS channels
  * Allows propagation of WS channels across multiple independent fastify instances through Redis
@@ -9,7 +9,7 @@
  */
 import { JTDSchemaType } from 'ajv/dist/core';
 import Ajv from 'ajv/dist/jtd';
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 
 import { REALM_NOTIF } from './interfaces/constants';
 import { Logger } from './interfaces/logger';
@@ -67,14 +67,14 @@ const redisSerdes = {
 
 // Helper to create a redis client instance
 function createRedisClientInstance(
-  redisConfig: Redis.RedisOptions,
+  redisConfig: RedisOptions,
   log: Logger = console,
-): Redis.Redis {
+): Redis {
   const redis = new Redis(redisConfig);
 
   redis.on('error', (err) => {
     log.error(
-      `graasp-websockets: MultiInstanceChannelsBroker failed to connect to Redis instance, reason:\n\t${err}`,
+      `graasp-plugin-websockets: MultiInstanceChannelsBroker failed to connect to Redis instance, reason:\n\t${err}`,
     );
   });
 
@@ -89,9 +89,9 @@ class MultiInstanceChannelsBroker {
   // WS channels abstraction instance
   private readonly wsChannels: WebSocketChannels;
   // Redis client subscriber instance
-  private readonly sub: Redis.Redis;
+  private readonly sub: Redis;
   // Redis client publisher instance
-  private readonly pub: Redis.Redis;
+  private readonly pub: Redis;
   // Notif channel name
   private readonly notifChannel: string;
 
@@ -99,7 +99,7 @@ class MultiInstanceChannelsBroker {
     wsChannels: WebSocketChannels,
     log: Logger = console,
     redisParams: {
-      config: Redis.RedisOptions;
+      config: RedisOptions;
       notifChannel: string;
     },
   ) {
@@ -111,7 +111,7 @@ class MultiInstanceChannelsBroker {
     this.sub.subscribe(this.notifChannel, (err, count) => {
       if (err) {
         log.error(
-          `graasp-websockets: MultiInstanceChannelsBroker failed to subscribe to ${this.notifChannel}, reason: ${err.message}`,
+          `graasp-plugin-websockets: MultiInstanceChannelsBroker failed to subscribe to ${this.notifChannel}, reason: ${err.message}`,
         );
         log.error(`\t${err}`);
       }
@@ -122,7 +122,7 @@ class MultiInstanceChannelsBroker {
         const msg = redisSerdes.parse(message);
         if (msg === undefined) {
           log.info(
-            `graasp-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${this.notifChannel}": ${message}`,
+            `graasp-plugin-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${this.notifChannel}": ${message}`,
           );
         } else {
           // forward notification to respective channel

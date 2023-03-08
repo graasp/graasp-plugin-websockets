@@ -1,12 +1,13 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Test utility functions and configuration
  */
-import Redis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 import WebSocket from 'ws';
 
-import fastify, { FastifyInstance } from 'fastify';
+import fastify from 'fastify';
+import { FastifyInstance } from 'fastify/types/instance';
 
 import graaspWebSockets from '../src';
 import { AjvMessageSerializer } from '../src/impls/message-serializer';
@@ -26,7 +27,7 @@ export interface TestConfig {
   port: number;
   prefix?: string;
   redis?: {
-    config?: Redis.RedisOptions;
+    config?: RedisOptions;
     channelName?: string;
   };
 }
@@ -136,9 +137,9 @@ export async function createFastifyInstance(
 }
 
 /**
- * Creates a fastify server in which graasp-websockets plugin was registered
+ * Creates a fastify server in which graasp-plugin-websockets plugin was registered
  * @param config TestConfig for this server
- * @returns Promise of fastify server instance with graasp-websockets plugin
+ * @returns Promise of fastify server instance with graasp-plugin-websockets plugin
  */
 export async function createWsFastifyInstance(
   config: TestConfig,

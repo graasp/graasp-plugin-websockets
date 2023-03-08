@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Message interface that describe the shape of messages
  * in the Graasp websocket protocol

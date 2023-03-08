@@ -1,17 +1,17 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
- * Fastify plugin for graasp-websockets
+ * Fastify plugin for graasp-plugin-websockets
  *
  * Integrates the {@link WebSocketChannels} abstraction
- * in a fastify server plugin with fastify-websocket
+ * in a fastify server plugin with @fastify/websocket
  */
-import Redis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 import util from 'util';
 
+import fws from '@fastify/websocket';
 import { FastifyLoggerInstance, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
-import fws from 'fastify-websocket';
 
 import config from './config';
 import { AjvMessageSerializer } from './impls/message-serializer';
@@ -25,7 +25,7 @@ import { WebSocketChannels } from './ws-channels';
 interface PluginOptions {
   prefix?: string;
   redis?: {
-    config?: Redis.RedisOptions;
+    config?: RedisOptions;
     channelName?: string;
   };
 }
@@ -60,7 +60,7 @@ function logBootMessage(log: FastifyLoggerInstance, config: PluginOptions) {
   });
 
   log.info(
-    `graasp-websockets: plugin booted with prefix ${config.prefix} and Redis parameters ${prettyRedisConfig}`,
+    `graasp-plugin-websockets: plugin booted with prefix ${config.prefix} and Redis parameters ${prettyRedisConfig}`,
   );
 }
 
@@ -79,7 +79,7 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
         wsChannels.clientRemove(conn.socket);
       }
       log.error(
-        `graasp-websockets: an error occured: ${error}\n\tDestroying connection`,
+        `graasp-plugin-websockets: an error occured: ${error}\n\tDestroying connection`,
       );
       conn.destroy();
     },
@@ -130,6 +130,8 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
         wsService.handleRequest(msg, member, client),
       );
 
+      client.on('error', log.error);
+
       client.on('close', (code, reason) => {
         wsChannels.clientRemove(client);
       });
@@ -148,5 +150,5 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
 
 export default fp(plugin, {
   fastify: '3.x',
-  name: 'graasp-websockets',
+  name: 'graasp-plugin-websockets',
 });

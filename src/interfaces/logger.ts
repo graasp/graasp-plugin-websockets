@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Logger interface
  * From https://github.com/kallaspriit/ts-log

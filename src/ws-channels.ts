@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Channels and broadcast abstractions on top of the ws library
  *
@@ -56,9 +56,11 @@ class Client {
     this.isAlive = true;
 
     // on heartbeat response, keep alive
-    this.ws.on('pong', (data) => {
-      this.isAlive = true;
-    });
+    this.ws.on('pong', this.keepAlive);
+  }
+
+  private keepAlive() {
+    this.isAlive = true;
   }
 
   /**
@@ -66,7 +68,7 @@ class Client {
    * MUST be called when the client closes
    */
   close() {
-    this.ws.removeEventListener('pong');
+    this.ws.off('pong', this.keepAlive);
   }
 }
 
@@ -108,13 +110,16 @@ class WebSocketChannels {
     this.serialize = serialize;
     this.logger = log;
 
+    // log errors
+    this.wsServer.on('error', log.error);
+
     // checks lost connections every defined time interval
     this.heartbeat = setInterval(() => {
       // find clients that are not registered anymore
       this.wsServer.clients.forEach((ws) => {
         if (this.subscriptions.get(ws) === undefined) {
           log.info(
-            `graasp-websockets: ejecting client ${ws.url}, orphan without subscriptions`,
+            `graasp-plugin-websockets: ejecting client ${ws.url}, orphan without subscriptions`,
           );
           ws.terminate();
         }
@@ -126,7 +131,7 @@ class WebSocketChannels {
           // remove from this instance also
           this.clientRemove(ws);
           log.info(
-            `graasp-websockets: ejecting client ${ws.url}, timeout detected`,
+            `graasp-plugin-websockets: ejecting client ${ws.url}, timeout detected`,
           );
           return ws.terminate();
         }
@@ -141,7 +146,7 @@ class WebSocketChannels {
         if (channel.removeIfEmpty && channel.subscribers.size === 0) {
           this.channelDelete(name);
           log.info(
-            `graasp-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`,
+            `graasp-plugin-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`,
           );
         }
       });
@@ -161,7 +166,7 @@ class WebSocketChannels {
   clientSend(client: WebSocket, message: ServerMessage): boolean {
     if (client.readyState !== WebSocket.OPEN) {
       this.logger.info(
-        `graasp-websockets: attempted to send message to client that was not ready (${message})`,
+        `graasp-plugin-websockets: attempted to send message to client that was not ready (${message})`,
       );
       return false;
     } else {

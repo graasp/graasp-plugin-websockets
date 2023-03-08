@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * JSON Type Definitions for {@link Message} types
  * See:
