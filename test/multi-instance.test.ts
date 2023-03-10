@@ -6,8 +6,9 @@
 import Redis from 'ioredis';
 import waitForExpect from 'wait-for-expect';
 
+import { Websocket } from '@graasp/sdk';
+
 import globalConfig from '../src/config';
-import { ClientSubscribe } from '../src/interfaces/message';
 import { createMockFastifyLogger } from './mocks';
 import {
   PortGenerator,
@@ -42,9 +43,9 @@ test('multi-instance broker', async () => {
   // subscribe each client to a respective broker instance on channel "test"
   const ack1 = clientWait(client1, 1);
   const ack2 = clientWait(client2, 1);
-  const req: ClientSubscribe = {
-    realm: 'notif',
-    action: 'subscribe',
+  const req: Websocket.ClientSubscribe = {
+    realm: Websocket.Realms.Notif,
+    action: Websocket.ClientActions.Subscribe,
     channel: 'test',
     topic: 'foo',
   };
@@ -53,9 +54,9 @@ test('multi-instance broker', async () => {
   const ack1Msg = await ack1;
   const ack2Msg = await ack2;
   const expected = {
-    realm: 'notif',
-    type: 'response',
-    status: 'success',
+    realm: Websocket.Realms.Notif,
+    type: Websocket.ServerMessageTypes.Response,
+    status: Websocket.ResponseStatuses.Success,
     request: req,
   };
   expect(ack1Msg).toStrictEqual(expected);
@@ -71,8 +72,8 @@ test('multi-instance broker', async () => {
   const values = await Promise.all([test1, test2]);
   values.forEach((value) => {
     expect(value).toStrictEqual({
-      realm: 'notif',
-      type: 'update',
+      realm: Websocket.Realms.Notif,
+      type: Websocket.ServerMessageTypes.Update,
       topic: 'foo',
       channel: 'test',
       body: msg,
@@ -89,8 +90,8 @@ test('multi-instance broker', async () => {
   const values2 = await Promise.all([b1, b2]);
   values2.forEach((value) => {
     expect(value).toStrictEqual({
-      realm: 'notif',
-      type: 'update',
+      realm: Websocket.Realms.Notif,
+      type: Websocket.ServerMessageTypes.Update,
       topic: 'foo',
       channel: 'broadcast',
       body: broadcast,

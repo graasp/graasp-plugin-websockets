@@ -11,9 +11,10 @@ import { JTDSchemaType } from 'ajv/dist/core';
 import Ajv from 'ajv/dist/jtd';
 import Redis, { RedisOptions } from 'ioredis';
 
-import { REALM_NOTIF } from './interfaces/constants';
-import { Logger } from './interfaces/logger';
-import { ServerMessage } from './interfaces/message';
+import { FastifyLoggerInstance } from 'fastify';
+
+import { Websocket } from '@graasp/sdk';
+
 import { serverMessageSchema } from './schemas';
 import { WebSocketChannels } from './ws-channels';
 
@@ -25,9 +26,9 @@ import { WebSocketChannels } from './ws-channels';
  * @param data data to be sent on the WS channel
  */
 interface RedisMessage {
-  realm: typeof REALM_NOTIF;
+  realm: Websocket.Realm;
   channel: string | 'broadcast';
-  data: ServerMessage;
+  data: Websocket.ServerMessage;
 }
 
 /**
@@ -36,11 +37,11 @@ interface RedisMessage {
  * @param channel WS channel name to send to, or "broadcast"
  */
 function createRedisMessage(
-  serverMessage: ServerMessage,
+  serverMessage: Websocket.ServerMessage,
   channel: string | 'broadcast',
 ): RedisMessage {
   return {
-    realm: REALM_NOTIF,
+    realm: Websocket.Realms.Notif,
     channel: channel,
     data: serverMessage,
   };
@@ -68,12 +69,12 @@ const redisSerdes = {
 // Helper to create a redis client instance
 function createRedisClientInstance(
   redisConfig: RedisOptions,
-  log: Logger = console,
+  log?: FastifyLoggerInstance,
 ): Redis {
   const redis = new Redis(redisConfig);
 
   redis.on('error', (err) => {
-    log.error(
+    log?.error(
       `graasp-plugin-websockets: MultiInstanceChannelsBroker failed to connect to Redis instance, reason:\n\t${err}`,
     );
   });
@@ -97,11 +98,11 @@ class MultiInstanceChannelsBroker {
 
   constructor(
     wsChannels: WebSocketChannels,
-    log: Logger = console,
     redisParams: {
       config: RedisOptions;
       notifChannel: string;
     },
+    log?: FastifyLoggerInstance,
   ) {
     this.wsChannels = wsChannels;
     this.notifChannel = redisParams.notifChannel;
@@ -110,10 +111,10 @@ class MultiInstanceChannelsBroker {
 
     this.sub.subscribe(this.notifChannel, (err, count) => {
       if (err) {
-        log.error(
+        log?.error(
           `graasp-plugin-websockets: MultiInstanceChannelsBroker failed to subscribe to ${this.notifChannel}, reason: ${err.message}`,
         );
-        log.error(`\t${err}`);
+        log?.error(`\t${err}`);
       }
     });
 
@@ -121,7 +122,7 @@ class MultiInstanceChannelsBroker {
       if (channel === this.notifChannel) {
         const msg = redisSerdes.parse(message);
         if (msg === undefined) {
-          log.info(
+          log?.info(
             `graasp-plugin-websockets: MultiInstanceChannelsBroker incorrect message received from Redis channel "${this.notifChannel}": ${message}`,
           );
         } else {
@@ -141,7 +142,10 @@ class MultiInstanceChannelsBroker {
    * @param channel Name of the WS channel to send to, or "broadcast" if it should be sent to all clients across instances
    * @param notif Message to be sent on a given WS channel
    */
-  dispatch(channel: string | 'broadcast', notif: ServerMessage): void {
+  dispatch(
+    channel: string | 'broadcast',
+    notif: Websocket.ServerMessage,
+  ): void {
     const msg = createRedisMessage(notif, channel);
     const json = redisSerdes.serialize(msg);
     this.pub.publish(this.notifChannel, json);
@@ -153,7 +157,7 @@ class MultiInstanceChannelsBroker {
    */
   async close(): Promise<void> {
     // cleanup open resources
-    await this.sub.unsubscribe(REALM_NOTIF);
+    await this.sub.unsubscribe(Websocket.Realms.Notif);
     this.sub.disconnect();
     this.pub.disconnect();
   }

@@ -14,10 +14,10 @@ import { FastifyLoggerInstance, FastifyPluginAsync } from 'fastify';
 import fp from 'fastify-plugin';
 
 import config from './config';
-import { AjvMessageSerializer } from './impls/message-serializer';
-import { Service } from './impls/ws-service';
+import { AjvMessageSerializer } from './message-serializer';
 import { MultiInstanceChannelsBroker } from './multi-instance';
 import { WebSocketChannels } from './ws-channels';
+import { WebsocketService } from './ws-service';
 
 /**
  * Type definition for plugin options
@@ -98,12 +98,17 @@ const plugin: FastifyPluginAsync<PluginOptions> = async (fastify, options) => {
   // create multi-instance channels broker
   const wsMultiBroker = new MultiInstanceChannelsBroker(
     wsChannels,
-    log,
     config.redis,
+    log,
   );
 
   // create websockets service
-  const wsService = new Service(wsChannels, wsMultiBroker, serdes.parse, log);
+  const wsService = new WebsocketService(
+    wsChannels,
+    wsMultiBroker,
+    serdes.parse,
+    log,
+  );
 
   // decorate server with service
   fastify.decorate('websockets', wsService);

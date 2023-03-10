@@ -7,8 +7,9 @@
  */
 import WebSocket from 'ws';
 
-import { Logger } from './interfaces/logger';
-import { ServerMessage } from './interfaces/message';
+import { FastifyLoggerInstance } from 'fastify';
+
+import { Websocket } from '@graasp/sdk';
 
 /**
  * Represents a WebSocket channel which clients can subscribe to
@@ -28,8 +29,8 @@ class Channel {
   }
 
   send(
-    message: ServerMessage,
-    sendFn: (client: WebSocket, msg: ServerMessage) => boolean,
+    message: Websocket.ServerMessage,
+    sendFn: (client: WebSocket, msg: Websocket.ServerMessage) => boolean,
   ) {
     let ret = true;
     this.subscribers.forEach((sub) => {
@@ -84,11 +85,11 @@ class WebSocketChannels {
   // Collection of all client subscriptions, identified by socket for lookup
   subscriptions: Map<WebSocket, Client>;
   // Serializer function
-  serialize: (data: ServerMessage) => WebSocket.Data;
+  serialize: (data: Websocket.ServerMessage) => WebSocket.Data;
   // Heartbeat interval instance
   heartbeat: NodeJS.Timeout;
   // Logging interface
-  logger: Logger;
+  logger: FastifyLoggerInstance | Console;
 
   /**
    * Creates a new WebSocketChannels instance
@@ -100,25 +101,25 @@ class WebSocketChannels {
    */
   constructor(
     wsServer: WebSocket.Server,
-    serialize: (data: ServerMessage) => WebSocket.Data,
-    log: Logger = console,
+    serialize: (data: Websocket.ServerMessage) => WebSocket.Data,
+    log?: FastifyLoggerInstance,
     heartbeatInterval: number = 30000,
   ) {
     this.wsServer = wsServer;
     this.channels = new Map();
     this.subscriptions = new Map();
     this.serialize = serialize;
-    this.logger = log;
+    this.logger = log ?? console;
 
     // log errors
-    this.wsServer.on('error', log.error);
+    this.wsServer.on('error', this.logger.error);
 
     // checks lost connections every defined time interval
     this.heartbeat = setInterval(() => {
       // find clients that are not registered anymore
       this.wsServer.clients.forEach((ws) => {
         if (this.subscriptions.get(ws) === undefined) {
-          log.info(
+          this.logger.info(
             `graasp-plugin-websockets: ejecting client ${ws.url}, orphan without subscriptions`,
           );
           ws.terminate();
@@ -130,7 +131,7 @@ class WebSocketChannels {
         if (client.isAlive === false) {
           // remove from this instance also
           this.clientRemove(ws);
-          log.info(
+          this.logger.info(
             `graasp-plugin-websockets: ejecting client ${ws.url}, timeout detected`,
           );
           return ws.terminate();
@@ -145,7 +146,7 @@ class WebSocketChannels {
       this.channels.forEach((channel, name) => {
         if (channel.removeIfEmpty && channel.subscribers.size === 0) {
           this.channelDelete(name);
-          log.info(
+          this.logger.info(
             `graasp-plugin-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`,
           );
         }
@@ -163,7 +164,7 @@ class WebSocketChannels {
    * @param client WebSocket client to send to
    * @param message Data to transmit
    */
-  clientSend(client: WebSocket, message: ServerMessage): boolean {
+  clientSend(client: WebSocket, message: Websocket.ServerMessage): boolean {
     if (client.readyState !== WebSocket.OPEN) {
       this.logger.info(
         `graasp-plugin-websockets: attempted to send message to client that was not ready (${message})`,
@@ -292,7 +293,7 @@ class WebSocketChannels {
    * @param channelName name of the channel to send a message on
    * @param message data to transmit
    */
-  channelSend(channelName: string, message: ServerMessage): boolean {
+  channelSend(channelName: string, message: Websocket.ServerMessage): boolean {
     const channel = this.channels.get(channelName);
     if (channel !== undefined) {
       return channel.send(message, (client, message) =>
@@ -306,7 +307,7 @@ class WebSocketChannels {
    * Sends an object message to all connected clients
    * @param message Object to broadcast to everyone
    */
-  broadcast(message: ServerMessage): boolean {
+  broadcast(message: Websocket.ServerMessage): boolean {
     let ret = true;
     this.wsServer.clients.forEach((client) => {
       ret = ret && this.clientSend(client, message);

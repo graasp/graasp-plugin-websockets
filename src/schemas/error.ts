@@ -1,15 +1,24 @@
 import { JTDSchemaType } from 'ajv/dist/jtd';
 
-import { Error } from '../interfaces/error';
+import { Websocket } from '@graasp/sdk';
+
+/** The serializer should remove sensitive fields such as stack trace */
+export type SerializedWebsocketError = Pick<
+  Websocket.Error,
+  'name' | 'message'
+>;
 
 /**
  * Error schema
- * MUST conform to {@link Error} (provide equivalent runtime types)
+ * {@link Websocket.Error}
+ * See:
+ *  https://ajv.js.org/guide/typescript.html
+ *  https://ajv.js.org/json-type-definition.html
  */
-export const errorSchema: JTDSchemaType<Error> = {
+export const errorSchema: JTDSchemaType<SerializedWebsocketError> = {
   properties: {
     name: {
-      enum: ['ACCESS_DENIED', 'BAD_REQUEST', 'NOT_FOUND', 'SERVER_ERROR'],
+      type: 'string',
     },
     message: { type: 'string' },
   },

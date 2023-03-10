@@ -10,7 +10,7 @@
 import waitForExpect from 'wait-for-expect';
 import WebSocket, { CLOSED, OPEN } from 'ws';
 
-import { createServerInfo } from '../src/interfaces/message';
+import { createServerInfo } from '../src/message';
 import {
   PortGenerator,
   createConnUrl,
