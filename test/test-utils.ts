@@ -221,15 +221,7 @@ export async function clientWait(
 
     if (numberMessages === 1) {
       client.on('message', (data) => {
-        if (typeof data !== 'string') {
-          reject(
-            new Error(
-              `Parsing error: server message could not be converted: ${data}`,
-            ),
-          );
-          return;
-        }
-        const msg = clientSerdes.parse(data);
+        const msg = clientSerdes.parse(data.toString());
         if (msg === undefined)
           reject(
             new Error(
@@ -241,15 +233,7 @@ export async function clientWait(
     } else {
       const buffer: Array<Websocket.ServerMessage> = [];
       client.on('message', (data) => {
-        if (typeof data !== 'string') {
-          reject(
-            new Error(
-              `Parsing error: server message could not be converted: ${data}`,
-            ),
-          );
-          return;
-        }
-        const msg = clientSerdes.parse(data);
+        const msg = clientSerdes.parse(data.toString());
         if (msg === undefined)
           reject(
             new Error(

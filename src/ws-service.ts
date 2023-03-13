@@ -137,12 +137,15 @@ export class WebsocketService implements IWebsocketService {
     member: Member<UnknownExtra>,
     client: WebSocket,
   ): void {
-    const request = this.parse(data);
+    const request = this.parse(
+      typeof data === 'string' ? data : data?.toString(),
+    );
 
     // validation error, send bad request
     if (request === undefined) {
       this.logger.info(
-        `graasp-plugin-websockets: Bad client request (memberID: ${member.id}, message: ${data})`,
+        `graasp-plugin-websockets: Bad client request (memberID: ${member.id} with message`,
+        data?.toString(),
       );
       const err = new Websocket.BadRequestError();
       this.wsChannels.clientSend(client, createServerErrorResponse(err));

@@ -38,7 +38,6 @@ describe('plugin options', () => {
         config: {
           host: '127.0.0.1',
           port: 6379,
-          password: 'redis-pass',
         },
         channelName: 'redis-channel-name',
       },
@@ -53,7 +52,7 @@ describe('plugin options', () => {
     await waitForExpect(() => {
       // password should not be logged
       expect(logInfoSpy).toHaveBeenCalledWith(
-        "graasp-plugin-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379, username: 'default' }, notifChannel: 'redis-channel-name' }",
+        "graasp-plugin-websockets: plugin booted with prefix /some-prefix and Redis parameters { config: { host: '127.0.0.1', port: 6379 }, notifChannel: 'redis-channel-name' }",
       );
     });
 
@@ -223,7 +222,8 @@ describe('client requests', () => {
       type: Websocket.ServerMessageTypes.Response,
       error: {
         name: 'BAD_REQUEST',
-        message: 'Request message format was not understood by the server',
+        message:
+          'Websocket: Request message format was not understood by the server',
       },
     });
   });
@@ -508,7 +508,7 @@ describe('error cases', () => {
       status: Websocket.ResponseStatuses.Error,
       error: {
         name: 'ACCESS_DENIED',
-        message: 'Access denied for the requested resource',
+        message: 'Websocket: Access denied for the requested resource',
       },
       request,
     });

@@ -5,6 +5,7 @@
  *
  * @author Alexandre CHAU
  */
+import util from 'util';
 import WebSocket from 'ws';
 
 import { FastifyLoggerInstance } from 'fastify';
@@ -71,6 +72,15 @@ class Client {
   close() {
     this.ws.off('pong', this.keepAlive);
   }
+
+  /**
+   * Pretty-print for logging
+   */
+  toString(): string {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { ws, ...props } = this; // ws object log is not very useful
+    return util.inspect(props);
+  }
 }
 
 /**
@@ -120,7 +130,7 @@ class WebSocketChannels {
       this.wsServer.clients.forEach((ws) => {
         if (this.subscriptions.get(ws) === undefined) {
           this.logger.info(
-            `graasp-plugin-websockets: ejecting client ${ws.url}, orphan without subscriptions`,
+            `graasp-plugin-websockets: ejecting client, orphan without subscriptions`,
           );
           ws.terminate();
         }
@@ -132,7 +142,9 @@ class WebSocketChannels {
           // remove from this instance also
           this.clientRemove(ws);
           this.logger.info(
-            `graasp-plugin-websockets: ejecting client ${ws.url}, timeout detected`,
+            `graasp-plugin-websockets: ejecting client, timeout detected`,
+            'client:',
+            client?.toString(),
           );
           return ws.terminate();
         }
@@ -148,6 +160,8 @@ class WebSocketChannels {
           this.channelDelete(name);
           this.logger.info(
             `graasp-plugin-websockets: removing channel "${name}" with removeIfEmpty=${channel.removeIfEmpty}: no subscribers left on this instance`,
+            'channel:',
+            channel,
           );
         }
       });
@@ -167,7 +181,9 @@ class WebSocketChannels {
   clientSend(client: WebSocket, message: Websocket.ServerMessage): boolean {
     if (client.readyState !== WebSocket.OPEN) {
       this.logger.info(
-        `graasp-plugin-websockets: attempted to send message to client that was not ready (${message})`,
+        `graasp-plugin-websockets: attempted to send message to client that was not ready,`,
+        'message:',
+        message,
       );
       return false;
     } else {
