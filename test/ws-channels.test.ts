@@ -62,7 +62,7 @@ test('adding / removing channels', () => {
 
 test("lost client is gc'd by heartbeat", async () => {
   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
-  const { channels, wss } = createWsChannels(config, 2000);
+  const { channels, wss } = createWsChannels(config, 100);
   const clients = await createWsClients(config, 2);
   expect(channels.subscriptions.size).toEqual(2);
   // forcefully close client 0

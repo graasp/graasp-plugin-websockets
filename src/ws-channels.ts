@@ -57,11 +57,18 @@ class Client {
     this.subscriptions = new Set();
     this.isAlive = true;
 
+    // fix: "this" in the keepAlive function must be bound to the local context!
+    // otherwise the call to this.ws.on('pong') will bind this in the closure to the websocket!
+    this.keepAlive = this.keepAlive.bind(this);
+
     // on heartbeat response, keep alive
     this.ws.on('pong', this.keepAlive);
   }
 
   private keepAlive() {
+    // important: make sure that this refers to the Client instance!
+    // when attaching to `ws` events e.g. this.ws.on('pong', <function>)
+    // the passed <function> will have its `this` value bound to the `ws` instance otherwise!!!
     this.isAlive = true;
   }
 
