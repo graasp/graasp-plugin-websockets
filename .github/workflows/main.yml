@@ -9,6 +9,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # abort running jobs if newer version is detected on same branch
+    concurrency:
+      group: ${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
+
     services:
       redis:
         image: redis
