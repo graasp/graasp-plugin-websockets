@@ -1,6 +1,6 @@
 # Adding real-time behaviour in Graasp applications
 
-You may want to add real-time interactions with the Graasp core server in your front-end application, or extend the real-time capabilities of the server in your own server code (such as other plugins). This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-websockets` plugin. For server-side registration of the plugin, see [README.md](README.md).
+You may want to add real-time interactions with the Graasp core server in your front-end application, or extend the real-time capabilities of the server in your own server code (such as other plugins). This guide provides a step-by-step tutorial on how to either use or extend the functionalities provided by the `graasp-plugin-websockets` plugin. For server-side registration of the plugin, see [README.md](README.md).
 
 ## Exploring and using ready-to-use React hooks
 
@@ -16,11 +16,8 @@ In this example, we would like to display the children of a folder item (as defi
 
 First install the `graasp-query-client` dependency in your package.json:
 
-```json
-"dependencies": {
-    "@graasp/query-client": "git://github.com/graasp/graasp-query-client.git#main",
-}
-
+```sh
+yarn add @graasp/query-client
 ```
 
 And then run `yarn install` (or `npm install` depending on your package manager).
@@ -57,7 +54,7 @@ const { data, isLoading } = hooks.useChildren(folderId, { getUpdates: false });
 
 That's it!
 
-## Consuming the `graasp-websockets` plugin to extend real-time capabilities
+## Consuming the `graasp-plugin-websockets` plugin to extend real-time capabilities
 
 The existing hooks may not provide the functionality required by your application. This section will describe how to extend the capabilities of the server as well as of the query client.
 
@@ -69,14 +66,12 @@ You can register additional websocket messages using the `websockets` service de
 
 Add the dependency in your `package.json` which is required to correctly load the types and augmentations:
 
-```jsonc
-  "dependencies": {
-      ...
-      "graasp-websockets": "git://github.com/graasp/graasp-websockets.git#master",
-  },
+```sh
+  # if you use npm
+  npm install @graasp/sdk @graasp/plugin-websockets
+  # if you use yarn
+  yarn add @graasp/sdk @graasp/plugin-websockets
 ```
-
-and then run `npm install` (or `yarn install` depending on your package manager)
 
 Then, destructure the service from the Fastify server:
 
@@ -87,36 +82,17 @@ const plugin = async (fastify, options) => {
 };
 ```
 
-> If you use Typescript to consume the plugin, the compiler may complain that the `websockets` property cannot be found:
->
-> ```
-> Property 'websockets' does not exist on type 'FastifyInstance<Server, IncomingMessage, ServerResponse, FastifyLoggerInstance>'.
-> ```
->
-> This is caused by the `fastify` module augmentation defined at [src/index.ts](src/index.ts) not being discovered by the compiler. As a workaround, redeclare the module augmentation with the corresponding property:
->
-> ```ts
-> // hack to force compiler to discover websockets service
-> declare module 'fastify' {
->   interface FastifyInstance {
->     websockets?: WebSocketService;
->   }
-> }
->
-> const plugin = async (fastify, options) => {
->   // 'websockets' should now be available on 'fastify'
->   const { websockets } = fastify;
-> };
-> ```
->
-> See https://github.com/graasp/graasp-websockets/issues/19
+The `websockets` service exposes the following API: see [`WebSocketService`](https://github.com/graasp/graasp-sdk/blob/main/src/services/websockets/interfaces/service.ts).
 
-The `websockets` service exposes the following API: [see `WebSocketService`](src/interfaces/ws-service.ts).
-
-Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`Error`](src/interfaces/error.ts). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
+Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`WebSocket.Error`](https://github.com/graasp/graasp-sdk/blob/main/src/services/websockets/errors.ts) or its subclasses (you must extend the parent abstract class if you want to add your own error semantics). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
 
 ```ts
-import { NotFound, AccessDenied } from 'graasp-websockets';
+import { Websocket } from '@graasp/plugin-websockets';
+
+class MyCustomError extends Websocket.Error {
+  name = 'CUSTOM_ERROR_NAME',
+  message = 'Websocket: my custom error message',
+}
 
 // register a topic called 'foo'
 websockets.register('foo', async (request) => {
@@ -125,12 +101,17 @@ websockets.register('foo', async (request) => {
   // example: check if the channel exists in the foo database
   const bar = await fooDb.get(channel);
   if (!bar) {
-    reject(NotFound());
+    reject(new Websocket.NotFoundError());
   }
 
   // example: check if member is allowed to use bar
   if (!bar.canUse(member)) {
-    reject(AccessDenied());
+    reject(new Websocket.AccessDeniedError());
+  }
+
+  // example: reject on some custom condition
+  if (someCustomCondition) {
+    reject(new MyCustomError())
   }
 });
 ```
@@ -147,12 +128,6 @@ websockets.publishLocal(
   'someChannelName',
   'Users connected to other instance will not receive me',
 );
-```
-
-The special channel name `broadcast` will send the message to all connected clients (globally or locally), irrespective of the topic scope.
-
-```ts
-websockets.publish('whatever', 'broadcast', 'everyone will receive me!');
 ```
 
 ### Client-side implementation and hooks in `graasp-query-client`

@@ -1,13 +1,15 @@
 import { JTDSchemaType } from 'ajv/dist/jtd';
 
-import { ClientMessage, ServerMessage } from '../interfaces/message';
-import { errorSchema } from './error';
+import { Websocket } from '@graasp/sdk';
 
 /**
  * Client message schema
- * MUST conform to {@link ClientMessage} (provide equivalent runtime types)
+ * MUST conform to {@link Websocket.ClientMessage} (provide equivalent runtime types)
+ * See:
+ *  https://ajv.js.org/guide/typescript.html
+ *  https://ajv.js.org/json-type-definition.html
  */
-export const clientMessageSchema: JTDSchemaType<ClientMessage> = {
+export const clientMessageSchema: JTDSchemaType<Websocket.ClientMessage> = {
   discriminator: 'action',
   mapping: {
     disconnect: {
@@ -41,20 +43,27 @@ export const clientMessageSchema: JTDSchemaType<ClientMessage> = {
 
 /**
  * Server message schema
- * MUST conform to {@link ServerMessage} (provide equivalent runtime types)
+ * MUST conform to {@link Websocket.ServerMessage} (provide equivalent runtime types)
+ * See:
+ *  https://ajv.js.org/guide/typescript.html
+ *  https://ajv.js.org/json-type-definition.html
  */
-export const serverMessageSchema: JTDSchemaType<ServerMessage> = {
+export const serverMessageSchema: JTDSchemaType<Websocket.ServerMessage> = {
   discriminator: 'type',
   mapping: {
     response: {
       properties: {
         realm: { enum: ['notif'] },
-        status: { enum: ['success', 'error'] },
+        status: {
+          enum: ['success', 'error'],
+        },
       },
       optionalProperties: {
-        error: errorSchema,
         request: clientMessageSchema,
       },
+      // allow server to optionally send an error property if status is Websocket.ReponseStatuses.Error
+      // this is fine because we control the object value anyway
+      additionalProperties: true,
     },
     info: {
       properties: {

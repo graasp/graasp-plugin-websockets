@@ -1,5 +1,5 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Tests for {@link WebSocketChannels}
  */
@@ -10,7 +10,7 @@
 import waitForExpect from 'wait-for-expect';
 import WebSocket, { CLOSED, OPEN } from 'ws';
 
-import { createServerInfo } from '../src/interfaces/message';
+import { createServerInfo } from '../src/message';
 import {
   PortGenerator,
   createConnUrl,
@@ -60,7 +60,7 @@ test('adding / removing channels', () => {
   wss.close();
 });
 
-test("lost client gc'd by heartbeat", async () => {
+test("lost client is gc'd by heartbeat", async () => {
   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const { channels, wss } = createWsChannels(config, 100);
   const clients = await createWsClients(config, 2);

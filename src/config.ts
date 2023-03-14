@@ -1,7 +1,7 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
- * Local configuration for graasp-websockets plugin
+ * Local configuration for graasp-plugin-websockets plugin
  */
 import dotenv from 'dotenv';
 

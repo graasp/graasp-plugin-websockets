@@ -1,21 +1,35 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Test utility functions and configuration
  */
-import Redis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 import WebSocket from 'ws';
 
-import fastify, { FastifyInstance } from 'fastify';
+import fastify, { FastifyLoggerInstance } from 'fastify';
+import { FastifyInstance } from 'fastify/types/instance';
+import { Bindings, ChildLoggerOptions } from 'fastify/types/logger';
+
+import { Websocket } from '@graasp/sdk';
 
 import graaspWebSockets from '../src';
-import { AjvMessageSerializer } from '../src/impls/message-serializer';
-import { ClientMessage, ServerMessage } from '../src/interfaces/message';
+import { AjvMessageSerializer } from '../src/message-serializer';
 import { WebSocketChannels } from '../src/ws-channels';
 import { mockSessionPreHandler, mockValidateSession } from './mocks';
 
 const clientSerdes = { serialize: JSON.stringify, parse: JSON.parse };
 const serverSerdes = new AjvMessageSerializer();
+
+export const TestingLogger: FastifyLoggerInstance = {
+  ...console,
+  fatal: console.error,
+  child: function (
+    bindings: Bindings,
+    options?: ChildLoggerOptions | undefined,
+  ): FastifyLoggerInstance {
+    throw new Error('Function not implemented.');
+  },
+};
 
 /**
  * Test config type
@@ -26,7 +40,7 @@ export interface TestConfig {
   port: number;
   prefix?: string;
   redis?: {
-    config?: Redis.RedisOptions;
+    config?: RedisOptions;
     channelName?: string;
   };
 }
@@ -78,7 +92,7 @@ export function createWsChannels(
   const wsChannels = new WebSocketChannels(
     server,
     serverSerdes.serialize,
-    console,
+    TestingLogger,
     heartbeatInterval,
   );
 
@@ -136,9 +150,9 @@ export async function createFastifyInstance(
 }
 
 /**
- * Creates a fastify server in which graasp-websockets plugin was registered
+ * Creates a fastify server in which graasp-plugin-websockets plugin was registered
  * @param config TestConfig for this server
- * @returns Promise of fastify server instance with graasp-websockets plugin
+ * @returns Promise of fastify server instance with graasp-plugin-websockets plugin
  */
 export async function createWsFastifyInstance(
   config: TestConfig,
@@ -199,7 +213,7 @@ export async function createWsClients(
 export async function clientWait(
   client: WebSocket,
   numberMessages: number,
-): Promise<ServerMessage | Array<ServerMessage>> {
+): Promise<Websocket.ServerMessage | Array<Websocket.ServerMessage>> {
   return new Promise((resolve, reject) => {
     client.on('error', (err) => {
       reject(err);
@@ -207,15 +221,7 @@ export async function clientWait(
 
     if (numberMessages === 1) {
       client.on('message', (data) => {
-        if (typeof data !== 'string') {
-          reject(
-            new Error(
-              `Parsing error: server message could not be converted: ${data}`,
-            ),
-          );
-          return;
-        }
-        const msg = clientSerdes.parse(data);
+        const msg = clientSerdes.parse(data.toString());
         if (msg === undefined)
           reject(
             new Error(
@@ -225,17 +231,9 @@ export async function clientWait(
         else resolve(msg);
       });
     } else {
-      const buffer: Array<ServerMessage> = [];
+      const buffer: Array<Websocket.ServerMessage> = [];
       client.on('message', (data) => {
-        if (typeof data !== 'string') {
-          reject(
-            new Error(
-              `Parsing error: server message could not be converted: ${data}`,
-            ),
-          );
-          return;
-        }
-        const msg = clientSerdes.parse(data);
+        const msg = clientSerdes.parse(data.toString());
         if (msg === undefined)
           reject(
             new Error(
@@ -260,7 +258,7 @@ export async function clientWait(
 export async function clientsWait(
   clients: Array<WebSocket>,
   numberMessages: number,
-): Promise<Array<ServerMessage | Array<ServerMessage>>> {
+): Promise<Array<Websocket.ServerMessage | Array<Websocket.ServerMessage>>> {
   return Promise.all(
     clients.map((client) => clientWait(client, numberMessages)),
   );
@@ -271,7 +269,10 @@ export async function clientsWait(
  * @param client WebSocket client to send from
  * @param data ClientMessage to be sent
  */
-export function clientSend(client: WebSocket, data: ClientMessage): void {
+export function clientSend(
+  client: WebSocket,
+  data: Websocket.ClientMessage,
+): void {
   client.send(clientSerdes.serialize(data));
 }
 
@@ -286,17 +287,17 @@ export async function expectClientSubscribe(
   channel: string,
 ): Promise<void> {
   const ack = clientWait(client, 1);
-  const req: ClientMessage = {
-    realm: 'notif',
-    action: 'subscribe',
+  const req: Websocket.ClientMessage = {
+    realm: Websocket.Realms.Notif,
+    action: Websocket.ClientActions.Subscribe,
     topic,
     channel,
   };
   clientSend(client, req);
   return expect(await ack).toStrictEqual({
-    realm: 'notif',
-    type: 'response',
-    status: 'success',
+    realm: Websocket.Realms.Notif,
+    type: Websocket.ServerMessageTypes.Response,
+    status: Websocket.ResponseStatuses.Success,
     req,
   });
 }

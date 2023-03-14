@@ -1,8 +1,8 @@
-# graasp-websockets
+# graasp-plugin-websockets
 
 A websockets extension for Graasp exposed through a fastify plugin
 
-![](https://img.shields.io/github/workflow/status/graasp/graasp-websockets/nodejs-ci?logo=github)
+![](https://img.shields.io/github/actions/workflow/status/graasp/graasp-plugin-websockets/main.yml?branch=main)
 
 This project provides back-end support for WebSockets in the Graasp ecosystem. It implements a Fastify plugin that can be registered into the core Graasp Fastify server instance.
 
@@ -14,17 +14,14 @@ This plugin requires a [Redis](https://redis.io/) instance which serves as a rel
 
 Add this plugin repository to the dependencies section of the `package.json` of your Graasp server instance:
 
-```jsonc
-  "dependencies": {
-      // Graasp's other dependencies...
-      "graasp-websockets": "git://github.com/graasp/graasp-websockets.git#master",
-  },
+```sh
+yarn add @graasp/sdk @graasp/plugin-websockets
 ```
 
 In the file of the designated WebSocket endpoint route, import the plugin:
 
 ```ts
-import graaspWebSockets from 'graasp-websockets';
+import graaspWebSockets from '@graasp/plugin-websockets';
 ```
 
 Register the plugin on your Fastify instance (here `instance` is the core Graasp Fastify instance, initialized / obtained beforehand):
@@ -32,12 +29,14 @@ Register the plugin on your Fastify instance (here `instance` is the core Graasp
 ```ts
     // make sure to register dependent services before!
     await instance.register(authPlugin, ...)
+    await instance.register(itemService, ...)
+    await instance.register(itemMembershipService, ...)
     //...
-    // then register graasp-websockets as follows
+    // then register graasp-plugin-websockets as follows
     await instance.register(graaspWebSockets);
 ```
 
-Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (i.e. `validateSession`, `log`)!
+Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in [`@graasp/sdk`](https://github.com/graasp/graasp-sdk) (i.e. `validateSession`, `log`, `items = { taskManager }`, ...)!
 
 The plugin accepts the following options (which all have sane defaults):
 
@@ -50,7 +49,7 @@ The plugin accepts the following options (which all have sane defaults):
                 port: +REDIS_PORT,
                 username: REDIS_USERNAME,
                 password: REDIS_PASSWORD,
-                ... // any other Redis.RedisOptions property from 'ioredis'
+                ... // any other RedisOptions property from 'ioredis'
             }
             channelName: 'graasp-notif',
         }
@@ -60,7 +59,7 @@ The plugin accepts the following options (which all have sane defaults):
 where:
 
 - `prefix` is the route of the websocket endpoint, relative to current registration scope. Websocket clients connect to this route to upgrade from HTTP(S) to WS(S).
-- `redis.config` is the configuration required to connect to the Redis server instance, which can contain any property from the `Redis.RedisOptions` type from `ioredis` ([see API reference](https://github.com/luin/ioredis/blob/master/API.md#new-redisport-host-options)).
+- `redis.config` is the configuration required to connect to the Redis server instance, which can contain any property from the `RedisOptions` type from `ioredis` ([see API reference](https://luin.github.io/ioredis/index.html#RedisOptions)).
 - `redis.channelName` is the name of the Redis pub/sub channel used to share websocket messages across multiple server instance (for instance in a cluster).
 
 The plugin will also decorate the Fastify instance with a websocket service under the `websockets` property. Read [USAGE.md](USAGE.md) for instructions on how to consume this service from other parts of the server, such as other plugins.
@@ -71,20 +70,20 @@ If you want to **use real-time updates from the server in front-end Graasp appli
 
 ## API
 
-This plugin implements a custom protocol over WebSoket between clients and this server plugin to send real-time notifications for specific Graasp behaviours. Please read [`API.md`](API.md) for more information about the messages format used between the server and clients that subscribe to updates from `graasp-websockets`.
+This plugin implements a custom protocol over WebSoket between clients and this server plugin to send real-time notifications for specific Graasp behaviours. Please read [`API.md`](API.md) for more information about the messages format used between the server and clients that subscribe to updates from `graasp-plugin-websockets`.
 
 ## Building locally
 
 If you'd like to run the code for other purposes (such as reusing modules without Graasp or just trying things out locally), clone this repository with:
 
 ```
-git clone https://github.com/graasp/graasp-websockets.git
+git clone https://github.com/graasp/graasp-plugin-websockets.git
 ```
 
 Then navigate into the cloned folder:
 
 ```
-cd graasp-websockets
+cd graasp-plugin-websockets
 ```
 
 Install the dependencies:
@@ -157,12 +156,12 @@ This repository also includes a run configuration for Github Actions in [`.githu
 
 #### Troubleshooting
 
-If your project depends on `graasp-websockets`, cannot fetch the `graasp-websockets` repository in your continuous integration system (such as Github Actions) and uses `yarn ci` as the install command, try using `yarn install` instead. There are known issues with Github SSH keys management.
+If your project depends on `graasp-plugin-websockets`, cannot fetch the `graasp-plugin-websockets` repository in your continuous integration system (such as Github Actions) and uses `yarn ci` as the install command, try using `yarn install` instead. There are known issues with Github SSH keys management.
 
 ## Repository structure
 
 - [`.github/`](.github/): Github-related configurations, such as Actions
-- [`src/`](src/): source code of the `graasp-websockets` plugin and its modules
+- [`src/`](src/): source code of the `graasp-plugin-websockets` plugin and its modules
 - [`test/`](test/): Jest unit and end-to-end tests (file names match sources in `src/`)
 - [`README.md`](README.md): [this file](README.md)
 - [`tsconfig.json`](tsconfig.json): TypeScript compiler configuration
@@ -188,7 +187,7 @@ Acknowledgements:
 This project and repository are licensed under the GNU Affero General Public License Version 3. Please read the [LICENSE](LICENSE) file for more details.
 
 ```
-    graasp-websockets - WebSockets for Graasp
+    graasp-plugin-websockets - WebSockets for Graasp
     Copyright (C) 2021 EPFL REACT
 
     This program is free software: you can redistribute it and/or modify

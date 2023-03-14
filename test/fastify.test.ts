@@ -1,9 +1,9 @@
 /**
- * graasp-websockets
+ * graasp-plugin-websockets
  *
  * Tests for fastify
  */
-import fws from 'fastify-websocket';
+import fws from '@fastify/websocket';
 
 import {
   PortGenerator,
@@ -28,7 +28,7 @@ const schema = {
 };
 
 /**
- * This does not test the behaviour of our code, but simply exhibits a behavior of fastify-websocket:
+ * This does not test the behaviour of our code, but simply exhibits a behavior of @fastify/websocket:
  * fastify will validate the schema on the response instead of the request on a GET endpoint
  * See https://www.fastify.io/docs/v3.12.x/Validation-and-Serialization/#validation
  */
@@ -64,10 +64,10 @@ test('fastify validates body response instead of request on GET endpoint', async
 });
 
 /**
- * This does not test the behaviour of our code, but simply exhibits a behavior of fastify-websocket:
+ * This does not test the behaviour of our code, but simply exhibits a behavior of @fastify/websocket:
  * websocket connections can only be established over GET requests
  */
-test('fastify-websocket cannot accept POST requests for websocket connections', async () => {
+test('@fastify/websocket cannot accept POST requests for websocket connections', async () => {
   const config = createDefaultLocalConfig({ port: portGen.getNewPort() });
   const test = createFastifyInstance(config, async (instance) => {
     await instance.register(fws);
