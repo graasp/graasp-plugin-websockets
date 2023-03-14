@@ -930,7 +930,7 @@ __metadata:
     "@commitlint/cli": 17.4.4
     "@commitlint/config-conventional": 17.4.4
     "@fastify/websocket": 5.0.1
-    "@graasp/sdk": "github:graasp/graasp-sdk#97-add-websocket-types"
+    "@graasp/sdk": 0.9.0
     "@trivago/prettier-plugin-sort-imports": 4.1.1
     "@types/ioredis": 5.0.0
     "@types/jest": 29.4.0
@@ -957,9 +957,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@graasp/sdk@github:graasp/graasp-sdk#97-add-websocket-types":
-  version: 0.8.1
-  resolution: "@graasp/sdk@https://github.com/graasp/graasp-sdk.git#commit=404d4cb042c0b88fe88261b4729e2ad4910a1775"
+"@graasp/sdk@npm:0.9.0":
+  version: 0.9.0
+  resolution: "@graasp/sdk@npm:0.9.0"
   dependencies:
     "@fastify/secure-session": 5.3.0
     aws-sdk: 2.1310.0
@@ -970,7 +970,7 @@ __metadata:
     qs: 6.11.0
     slonik: 28.1.1
     uuid: 9.0.0
-  checksum: 770ba0ff35264a16120be7e24e55464eb39add5515cc865dcc7b2d305b028753f37b3e3b52c22257ded8c6bfd02063a6e41f3305894f5928f46f084332c82d67
+  checksum: 1fc427f9075450d9aac51efd9949516d8fd65670bae795c535ce813f36023ec514d445e78e90b6681a7c18a297b51bc2e5e15e54d381711f3a890ffd19ead8a1
   languageName: node
   linkType: hard
 

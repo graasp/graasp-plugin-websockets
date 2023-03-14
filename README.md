@@ -2,7 +2,7 @@
 
 A websockets extension for Graasp exposed through a fastify plugin
 
-![](https://img.shields.io/github/workflow/status/graasp/graasp-plugin-websockets/nodejs-ci?logo=github)
+![](https://img.shields.io/github/actions/workflow/status/graasp/graasp-plugin-websockets/main.yml?branch=main)
 
 This project provides back-end support for WebSockets in the Graasp ecosystem. It implements a Fastify plugin that can be registered into the core Graasp Fastify server instance.
 
@@ -14,17 +14,14 @@ This plugin requires a [Redis](https://redis.io/) instance which serves as a rel
 
 Add this plugin repository to the dependencies section of the `package.json` of your Graasp server instance:
 
-```jsonc
-  "dependencies": {
-      // Graasp's other dependencies...
-      "graasp-plugin-websockets": "git://github.com/graasp/graasp-plugin-websockets.git#master",
-  },
+```sh
+yarn add @graasp/sdk @graasp/plugin-websockets
 ```
 
 In the file of the designated WebSocket endpoint route, import the plugin:
 
 ```ts
-import graaspWebSockets from 'graasp-plugin-websockets';
+import graaspWebSockets from '@graasp/plugin-websockets';
 ```
 
 Register the plugin on your Fastify instance (here `instance` is the core Graasp Fastify instance, initialized / obtained beforehand):
@@ -32,12 +29,14 @@ Register the plugin on your Fastify instance (here `instance` is the core Graasp
 ```ts
     // make sure to register dependent services before!
     await instance.register(authPlugin, ...)
+    await instance.register(itemService, ...)
+    await instance.register(itemMembershipService, ...)
     //...
     // then register graasp-plugin-websockets as follows
     await instance.register(graaspWebSockets);
 ```
 
-Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in `graasp-types` (i.e. `validateSession`, `log`)!
+Services that are destructured from the Fastify instance in [`src/service-api.ts`](src/service-api.ts) must be registered beforehand and decorate it with the corresponding names, as defined in [`@graasp/sdk`](https://github.com/graasp/graasp-sdk) (i.e. `validateSession`, `log`, `items = { taskManager }`, ...)!
 
 The plugin accepts the following options (which all have sane defaults):
 
@@ -60,7 +59,7 @@ The plugin accepts the following options (which all have sane defaults):
 where:
 
 - `prefix` is the route of the websocket endpoint, relative to current registration scope. Websocket clients connect to this route to upgrade from HTTP(S) to WS(S).
-- `redis.config` is the configuration required to connect to the Redis server instance, which can contain any property from the `RedisOptions` type from `ioredis` ([see API reference](https://github.com/luin/ioredis/blob/master/API.md#new-redisport-host-options)).
+- `redis.config` is the configuration required to connect to the Redis server instance, which can contain any property from the `RedisOptions` type from `ioredis` ([see API reference](https://luin.github.io/ioredis/index.html#RedisOptions)).
 - `redis.channelName` is the name of the Redis pub/sub channel used to share websocket messages across multiple server instance (for instance in a cluster).
 
 The plugin will also decorate the Fastify instance with a websocket service under the `websockets` property. Read [USAGE.md](USAGE.md) for instructions on how to consume this service from other parts of the server, such as other plugins.

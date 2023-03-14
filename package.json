@@ -2,43 +2,44 @@
   "name": "@graasp/plugin-websockets",
   "version": "1.0.0",
   "description": "Websockets extension for graasp",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc",
-    "prepare": "yarn build",
-    "prepack": "yarn build",
-    "clean": "npx shx rm -rf dist/ coverage/",
-    "lint": "npx eslint . --ext .js,.jsx,.ts,.tsx",
-    "test": "yarn build && npx jest",
-    "test:ci": "npx jest --ci --colors",
-    "prettier:check": "prettier --check \"{src,test}/**/*.ts\"",
-    "prettier:write": "prettier --write \"{src,test}/**/*.ts\"",
-    "pre-commit": "yarn prettier:check && yarn lint",
-    "hooks:uninstall": "husky uninstall",
-    "hooks:install": "husky install",
-    "post-commit": "git status"
+  "keywords": [
+    "graasp",
+    "websockets"
+  ],
+  "homepage": "https://github.com/graasp/graasp-plugin-websockets#readme",
+  "bugs": {
+    "url": "https://github.com/graasp/graasp-plugin-websockets/issues"
   },
   "repository": {
     "type": "git",
     "url": "git://github.com/graasp/graasp-plugin-websockets.git"
   },
-  "keywords": [
-    "graasp",
-    "websockets"
-  ],
-  "author": "React EPFL",
+  "license": "AGPL-3.0-or-later",
+  "author": "Graasp",
   "contributors": [
     "Alexandre Chau",
     "André Nogueira"
   ],
-  "license": "AGPL-3.0-or-later",
-  "bugs": {
-    "url": "https://github.com/graasp/graasp-plugin-websockets/issues"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "npx shx rm -rf dist/ coverage/",
+    "hooks:install": "husky install",
+    "hooks:uninstall": "husky uninstall",
+    "lint": "npx eslint . --ext .js,.jsx,.ts,.tsx",
+    "prepack": "yarn build",
+    "post-commit": "git status",
+    "pre-commit": "yarn prettier:check && yarn lint",
+    "prepare": "yarn build",
+    "prettier:check": "prettier --check \"{src,test}/**/*.ts\"",
+    "prettier:write": "prettier --write \"{src,test}/**/*.ts\"",
+    "test": "yarn build && npx jest",
+    "test:ci": "npx jest --ci --colors"
   },
-  "homepage": "https://github.com/graasp/graasp-plugin-websockets#readme",
   "dependencies": {
     "@fastify/websocket": "5.0.1",
+    "@graasp/sdk": "0.9.0",
     "ajv": "8.12.0",
     "dotenv": "16.0.3",
     "fastify": "3.29.5",
@@ -48,7 +49,6 @@
   "devDependencies": {
     "@commitlint/cli": "17.4.4",
     "@commitlint/config-conventional": "17.4.4",
-    "@graasp/sdk": "github:graasp/graasp-sdk#97-add-websocket-types",
     "@trivago/prettier-plugin-sort-imports": "4.1.1",
     "@types/ioredis": "5.0.0",
     "@types/jest": "29.4.0",

@@ -16,11 +16,8 @@ In this example, we would like to display the children of a folder item (as defi
 
 First install the `graasp-query-client` dependency in your package.json:
 
-```json
-"dependencies": {
-    "@graasp/query-client": "git://github.com/graasp/graasp-query-client.git#main",
-}
-
+```sh
+yarn add @graasp/query-client
 ```
 
 And then run `yarn install` (or `npm install` depending on your package manager).
@@ -85,12 +82,17 @@ const plugin = async (fastify, options) => {
 };
 ```
 
-The `websockets` service exposes the following API: [see `WebSocketService`](src/interfaces/ws-service.ts).
+The `websockets` service exposes the following API: see [`WebSocketService`](https://github.com/graasp/graasp-sdk/blob/main/src/services/websockets/interfaces/service.ts).
 
-Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`Error`](src/interfaces/error.ts). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
+Register topics with corresponding validation functions. Topics must be globally unique across the server instance as they scope channels into groups. The validation function is invoked every time a client attempts to subscribe to a channel from the requested topic. It is the responsibility of the consumer to reject invalid connections (e.g. channels that may not exist, authorization checks, etc.) using the `request.reject(error)` method of the parameter with an error of type [`WebSocket.Error`](https://github.com/graasp/graasp-sdk/blob/main/src/services/websockets/errors.ts) or its subclasses (you must extend the parent abstract class if you want to add your own error semantics). Other properties can be accessed through the `request` object, such as the channel name and the requester member.
 
 ```ts
-import { AccessDenied, NotFound } from 'graasp-plugin-websockets';
+import { Websocket } from '@graasp/plugin-websockets';
+
+class MyCustomError extends Websocket.Error {
+  name = 'CUSTOM_ERROR_NAME',
+  message = 'Websocket: my custom error message',
+}
 
 // register a topic called 'foo'
 websockets.register('foo', async (request) => {
@@ -99,12 +101,17 @@ websockets.register('foo', async (request) => {
   // example: check if the channel exists in the foo database
   const bar = await fooDb.get(channel);
   if (!bar) {
-    reject(NotFound());
+    reject(new Websocket.NotFoundError());
   }
 
   // example: check if member is allowed to use bar
   if (!bar.canUse(member)) {
-    reject(AccessDenied());
+    reject(new Websocket.AccessDeniedError());
+  }
+
+  // example: reject on some custom condition
+  if (someCustomCondition) {
+    reject(new MyCustomError())
   }
 });
 ```
@@ -121,12 +128,6 @@ websockets.publishLocal(
   'someChannelName',
   'Users connected to other instance will not receive me',
 );
-```
-
-The special channel name `broadcast` will send the message to all connected clients (globally or locally), irrespective of the topic scope.
-
-```ts
-websockets.publish('whatever', 'broadcast', 'everyone will receive me!');
 ```
 
 ### Client-side implementation and hooks in `graasp-query-client`
